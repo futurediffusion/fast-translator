@@ -1,6 +1,11 @@
 # Floating Translator PySide6 GUI
 
 from PySide6 import QtCore, QtGui, QtWidgets
+import json
+from urllib import request, parse
+
+# User-provided Google API key for translation
+GOOGLE_API_KEY = "AIzaSyBQG_h_E_p9g7QvPpiiCt_qyiChmNNI6dE"
 
 class FloatingTranslatorWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -118,14 +123,26 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.translated_label.setText(translated)
 
     def translate_text(self, text):
-        mapping = {
-            "Hola": "Hello",
-            "¿cómo estás?": "how are you?",
+        """Translate Spanish text to English using Google API."""
+        params = {
+            "q": text,
+            "target": "en",
+            "source": "es",
+            "format": "text",
+            "key": GOOGLE_API_KEY,
         }
-        result = text
-        for es, en in mapping.items():
-            result = result.replace(es, en)
-        return result
+        try:
+            data = parse.urlencode(params).encode()
+            req = request.Request(
+                "https://translation.googleapis.com/language/translate/v2",
+                data=data,
+            )
+            with request.urlopen(req) as resp:
+                payload = json.loads(resp.read().decode())
+                return payload["data"]["translations"][0]["translatedText"]
+        except Exception as exc:
+            print("Translation failed:", exc)
+            return text
 
     def copy_translation(self):
         clipboard = QtWidgets.QApplication.clipboard()
