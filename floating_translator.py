@@ -99,8 +99,9 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "}"
         )
         self.translated_label = QtWidgets.QLabel("Hello, how are you?")
+        # Show translations in blue for better visibility
         self.translated_label.setStyleSheet(
-            "color: black; font-size: 16px; font-weight: bold;"
+            "color: blue; font-size: 16px; font-weight: bold;"
         )
         bottom_row = QtWidgets.QHBoxLayout()
         bottom_row.addWidget(self.translated_label)
@@ -153,12 +154,24 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             )
             with request.urlopen(req) as resp:
                 data = json.loads(resp.read().decode())
-                return data["candidates"][0]["content"]["parts"][0][
-                    "text"
-                ].strip()
+                raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                return self.clean_translation(raw_text)
         except Exception as exc:
             print("Translation failed:", exc)
             return text
+
+    def clean_translation(self, text: str) -> str:
+        """Return a simplified single-line translation."""
+        if not text:
+            return text
+        # Take only the first line if the model returned multiple suggestions
+        line = text.strip().splitlines()[0]
+        # Remove common bullet or formatting characters
+        line = line.lstrip("*-• ").strip()
+        if line.startswith("**") and line.endswith("**"):
+            line = line[2:-2]
+        line = line.strip("*")
+        return line
 
     def copy_translation(self):
         clipboard = QtWidgets.QApplication.clipboard()
