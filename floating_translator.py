@@ -90,10 +90,18 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         # Only translate after the user presses Enter
         self.input_edit.returnPressed.connect(self.translate_current_text)
         self.input_edit.setStyleSheet(
-            "QLineEdit { border: none; background: transparent; font-size: 16px; }"
+            "QLineEdit {"
+            "color: black;"
+            "font-weight: bold;"
+            "border: none;"
+            "background: transparent;"
+            "font-size: 16px;"
+            "}"
         )
         self.translated_label = QtWidgets.QLabel("Hello, how are you?")
-        self.translated_label.setStyleSheet("color: #007AFF; font-size: 16px;")
+        self.translated_label.setStyleSheet(
+            "color: black; font-size: 16px; font-weight: bold;"
+        )
         bottom_row = QtWidgets.QHBoxLayout()
         bottom_row.addWidget(self.translated_label)
         bottom_row.addStretch()
