@@ -4,6 +4,12 @@ from PySide6 import QtCore, QtGui, QtWidgets
 import json
 from urllib import request
 
+# Optional fallback translator if Gemini filtering fails
+try:
+    from googletrans import Translator as GoogleTranslator
+except Exception:  # pragma: no cover - optional dependency
+    GoogleTranslator = None
+
 # API key for Google's Gemini generative language API
 GEMINI_API_KEY = "AIzaSyDnO8MO4qFgkOcSO2eHVZkfQ7cZ2KhrA5I"
 
@@ -155,10 +161,22 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             with request.urlopen(req) as resp:
                 data = json.loads(resp.read().decode())
                 raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                return self.clean_translation(raw_text)
+                if raw_text:
+                    return self.clean_translation(raw_text)
         except Exception as exc:
             print("Translation failed:", exc)
-            return text
+
+        # If Gemini failed or returned empty, try googletrans if available
+        if GoogleTranslator is not None:
+            try:
+                translator = GoogleTranslator()
+                translated = translator.translate(text, src="es", dest="en").text
+                return translated
+            except Exception as fallback_exc:  # pragma: no cover - best effort
+                print("Fallback translation failed:", fallback_exc)
+
+        # As a last resort, return the original text
+        return text
 
     def clean_translation(self, text: str) -> str:
         """Return a simplified single-line translation."""
