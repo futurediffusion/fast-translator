@@ -22,8 +22,9 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint,
         )
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.resize(380, 160)
-        self.setMinimumSize(300, 140)
+        # Start with a slightly larger window so multiple lines fit easily
+        self.resize(420, 200)
+        self.setMinimumSize(320, 160)
         self.offset = None
         self.init_ui()
 
