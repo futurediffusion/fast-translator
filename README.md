@@ -18,3 +18,7 @@ The translator prompts the Gemini API to respond with the English
 translation enclosed in double asterisks (for example `**hello**`).
 The application filters the response to display only the text inside the
 asterisks.
+
+Press `Ctrl+Enter` (or `Ctrl+Return`) inside the input box to send the text
+for translation. The input field supports multiple lines so you can type
+longer passages.
