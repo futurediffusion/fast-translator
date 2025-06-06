@@ -26,6 +26,8 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.resize(420, 200)
         self.setMinimumSize(320, 160)
         self.offset = None
+        self.source_lang = "es"
+        self.target_lang = "en"
         self.init_ui()
 
     def init_ui(self):
@@ -69,20 +71,32 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         # Language row
         lang_row = QtWidgets.QHBoxLayout()
         lang_row.setAlignment(QtCore.Qt.AlignCenter)
-        esp_label = QtWidgets.QLabel("Espa\u00f1ol")
-        arrow_label = QtWidgets.QLabel("\u2192")
-        eng_label = QtWidgets.QLabel("Ingl\u00e9s")
-        for lbl in (esp_label, arrow_label, eng_label):
+        self.src_label = QtWidgets.QLabel("Espa\u00f1ol")
+        self.swap_btn = QtWidgets.QPushButton("\u2192")
+        self.swap_btn.setObjectName("swap")
+        self.swap_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.swap_btn.clicked.connect(self.swap_languages)
+        self.swap_btn.setStyleSheet(
+            "QPushButton#swap {"
+            "border: none;"
+            "background: transparent;"
+            "font-size: 14px;"
+            "color: black;"
+            "}"
+            "QPushButton#swap:hover { color: blue; }"
+        )
+        self.dest_label = QtWidgets.QLabel("Ingl\u00e9s")
+        for lbl in (self.src_label, self.dest_label):
             lbl.setStyleSheet("font-size: 14px; color: black;")
             lbl.setAlignment(QtCore.Qt.AlignCenter)
             lbl.setSizePolicy(
                 QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
             )
-        lang_row.addWidget(esp_label)
+        lang_row.addWidget(self.src_label)
         lang_row.addSpacing(6)
-        lang_row.addWidget(arrow_label)
+        lang_row.addWidget(self.swap_btn)
         lang_row.addSpacing(6)
-        lang_row.addWidget(eng_label)
+        lang_row.addWidget(self.dest_label)
         main_layout.addLayout(lang_row)
 
         # Translation card
@@ -162,18 +176,38 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         translated = self.translate_text(text)
         self.translated_label.setText(translated)
 
+    def swap_languages(self):
+        """Swap source and target languages."""
+        self.source_lang, self.target_lang = self.target_lang, self.source_lang
+        if self.source_lang == "es":
+            self.src_label.setText("Espa\u00f1ol")
+            self.dest_label.setText("Ingl\u00e9s")
+            self.swap_btn.setText("\u2192")
+        else:
+            self.src_label.setText("Ingl\u00e9s")
+            self.dest_label.setText("Espa\u00f1ol")
+            self.swap_btn.setText("\u2192")
+
     def translate_current_text(self):
         """Handle the Enter key press from the input box."""
         self.on_text_changed(self.input_edit.toPlainText())
 
     def translate_text(self, text):
-        """Translate Spanish text to English using Gemini."""
-        prompt = (
-            "Translate the following Spanish text to English as a single"
-            " concise phrase. Respond only with the English translation"
-            " wrapped in double asterisks.\n\nSpanish: "
-            f"{text}"
-        )
+        """Translate text using Gemini following current language settings."""
+        if self.source_lang == "es":
+            prompt = (
+                "Translate the following Spanish text to English as a single"
+                " concise phrase. Respond only with the English translation"
+                " wrapped in double asterisks.\n\nSpanish: "
+                f"{text}"
+            )
+        else:
+            prompt = (
+                "Translate the following English text to Spanish as a single"
+                " concise phrase. Respond only with the Spanish translation"
+                " wrapped in double asterisks.\n\nEnglish: "
+                f"{text}"
+            )
         payload = json.dumps(
             {"contents": [{"parts": [{"text": prompt}]}]}
         ).encode()
@@ -196,7 +230,9 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         if GoogleTranslator is not None:
             try:
                 translator = GoogleTranslator()
-                translated = translator.translate(text, src="es", dest="en").text
+                translated = translator.translate(
+                    text, src=self.source_lang, dest=self.target_lang
+                ).text
                 return translated
             except Exception as fallback_exc:  # pragma: no cover - best effort
                 print("Fallback translation failed:", fallback_exc)
