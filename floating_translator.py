@@ -2,6 +2,7 @@
 
 from PySide6 import QtCore, QtGui, QtWidgets
 import json
+import re
 from urllib import request
 
 # Optional fallback translator if Gemini filtering fails
@@ -147,7 +148,12 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
     def translate_text(self, text):
         """Translate Spanish text to English using Gemini."""
-        prompt = f"Translate the following Spanish text to English: {text}"
+        prompt = (
+            "Translate the following Spanish text to English as a single"
+            " concise phrase. Respond only with the English translation"
+            " wrapped in double asterisks.\n\nSpanish: "
+            f"{text}"
+        )
         payload = json.dumps(
             {"contents": [{"parts": [{"text": prompt}]}]}
         ).encode()
@@ -186,6 +192,12 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         line = text.strip().splitlines()[0]
         # Remove common bullet or formatting characters
         line = line.lstrip("*-• ").strip()
+
+        # Extract content wrapped in double asterisks if present
+        match = re.search(r"\*\*(.+?)\*\*", line)
+        if match:
+            return match.group(1).strip()
+
         if line.startswith("**") and line.endswith("**"):
             line = line[2:-2]
         line = line.strip("*")
