@@ -22,7 +22,8 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint,
         )
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
-        self.setFixedSize(380, 160)
+        self.resize(380, 160)
+        self.setMinimumSize(300, 140)
         self.offset = None
         self.init_ui()
 
@@ -36,7 +37,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "border-radius: 32px;"
             "}"
         )
-        self.container.setGeometry(0, 0, 380, 160)
+        self.container.setGeometry(0, 0, self.width(), self.height())
         effect = QtWidgets.QGraphicsDropShadowEffect(
             blurRadius=20, xOffset=0, yOffset=2
         )
@@ -44,11 +45,11 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.container.setGraphicsEffect(effect)
 
         # Close button
-        close_btn = QtWidgets.QPushButton("\u2715", self.container)
-        close_btn.setObjectName("close")
-        close_btn.setFixedSize(16, 16)
-        close_btn.clicked.connect(self.close)
-        close_btn.setStyleSheet(
+        self.close_btn = QtWidgets.QPushButton("\u2715", self.container)
+        self.close_btn.setObjectName("close")
+        self.close_btn.setFixedSize(16, 16)
+        self.close_btn.clicked.connect(self.close)
+        self.close_btn.setStyleSheet(
             "QPushButton#close {"
             "border: none;"
             "color: white;"
@@ -58,7 +59,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "}"
             "QPushButton#close:hover { background-color: #ff6666; }"
         )
-        close_btn.move(self.width() - 24, 8)
+        self.close_btn.move(self.width() - 24, 8)
 
         main_layout = QtWidgets.QVBoxLayout(self.container)
         main_layout.setContentsMargins(20, 20, 20, 20)
@@ -66,16 +67,17 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
         # Language row
         lang_row = QtWidgets.QHBoxLayout()
+        lang_row.setAlignment(QtCore.Qt.AlignCenter)
         esp_label = QtWidgets.QLabel("Espa\u00f1ol")
         arrow_label = QtWidgets.QLabel("\u2192")
         eng_label = QtWidgets.QLabel("Ingl\u00e9s")
         for lbl in (esp_label, arrow_label, eng_label):
-            lbl.setStyleSheet("font-size: 14px;")
-        arrow_label.setAlignment(QtCore.Qt.AlignCenter)
+            lbl.setStyleSheet("font-size: 14px; color: black;")
+            lbl.setAlignment(QtCore.Qt.AlignCenter)
         lang_row.addWidget(esp_label)
-        lang_row.addStretch()
+        lang_row.addSpacing(6)
         lang_row.addWidget(arrow_label)
-        lang_row.addStretch()
+        lang_row.addSpacing(6)
         lang_row.addWidget(eng_label)
         main_layout.addLayout(lang_row)
 
@@ -137,6 +139,12 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         card_layout.addLayout(bottom_row)
 
         main_layout.addWidget(card)
+
+        grip_row = QtWidgets.QHBoxLayout()
+        grip_row.addStretch()
+        self.size_grip = QtWidgets.QSizeGrip(self.container)
+        grip_row.addWidget(self.size_grip)
+        main_layout.addLayout(grip_row)
 
     def on_text_changed(self, text):
         translated = self.translate_text(text)
@@ -206,6 +214,11 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
     def copy_translation(self):
         clipboard = QtWidgets.QApplication.clipboard()
         clipboard.setText(self.translated_label.text())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.container.setGeometry(0, 0, self.width(), self.height())
+        self.close_btn.move(self.width() - 24, 8)
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
