@@ -7,9 +7,13 @@ from urllib import request
 # API key for Google's Gemini generative language API
 GEMINI_API_KEY = "AIzaSyDnO8MO4qFgkOcSO2eHVZkfQ7cZ2KhrA5I"
 
+
 class FloatingTranslatorWindow(QtWidgets.QWidget):
     def __init__(self):
-        super().__init__(None, QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint)
+        super().__init__(
+            None,
+            QtCore.Qt.WindowStaysOnTopHint | QtCore.Qt.FramelessWindowHint,
+        )
         self.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         self.setFixedSize(380, 160)
         self.offset = None
@@ -26,7 +30,9 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "}"
         )
         self.container.setGeometry(0, 0, 380, 160)
-        effect = QtWidgets.QGraphicsDropShadowEffect(blurRadius=20, xOffset=0, yOffset=2)
+        effect = QtWidgets.QGraphicsDropShadowEffect(
+            blurRadius=20, xOffset=0, yOffset=2
+        )
         effect.setColor(QtGui.QColor(0, 0, 0, 80))
         self.container.setGraphicsEffect(effect)
 
@@ -81,20 +87,16 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
         self.input_edit = QtWidgets.QLineEdit()
         self.input_edit.setText("Hola, ¿cómo estás?")
-        self.input_edit.textChanged.connect(self.on_text_changed)
+        # Only translate after the user presses Enter
+        self.input_edit.returnPressed.connect(self.translate_current_text)
         self.input_edit.setStyleSheet(
             "QLineEdit { border: none; background: transparent; font-size: 16px; }"
         )
         self.translated_label = QtWidgets.QLabel("Hello, how are you?")
-        self.translated_label.setStyleSheet(
-            "color: #007AFF; font-size: 16px;"
-        )
+        self.translated_label.setStyleSheet("color: #007AFF; font-size: 16px;")
         bottom_row = QtWidgets.QHBoxLayout()
         bottom_row.addWidget(self.translated_label)
         bottom_row.addStretch()
-        arrow_right = QtWidgets.QLabel("\u003e")
-        arrow_right.setStyleSheet("color: #007AFF; font-size: 16px;")
-        bottom_row.addWidget(arrow_right)
 
         self.copy_btn = QtWidgets.QPushButton()
         self.copy_btn.setObjectName("copy")
@@ -109,7 +111,9 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "}"
             "QPushButton#copy:hover { background-color: #cce4ff; }"
         )
-        copy_icon = self.style().standardIcon(QtWidgets.QStyle.SP_DialogOpenButton)
+        copy_icon = self.style().standardIcon(
+            QtWidgets.QStyle.SP_DialogOpenButton
+        )
         self.copy_btn.setIcon(copy_icon)
         bottom_row.addWidget(self.copy_btn)
 
@@ -122,12 +126,16 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         translated = self.translate_text(text)
         self.translated_label.setText(translated)
 
+    def translate_current_text(self):
+        """Handle the Enter key press from the input box."""
+        self.on_text_changed(self.input_edit.text())
+
     def translate_text(self, text):
         """Translate Spanish text to English using Gemini."""
         prompt = f"Translate the following Spanish text to English: {text}"
-        payload = json.dumps({
-            "contents": [{"parts": [{"text": prompt}]}]
-        }).encode()
+        payload = json.dumps(
+            {"contents": [{"parts": [{"text": prompt}]}]}
+        ).encode()
         try:
             req = request.Request(
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
@@ -137,7 +145,9 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             )
             with request.urlopen(req) as resp:
                 data = json.loads(resp.read().decode())
-                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                return data["candidates"][0]["content"]["parts"][0][
+                    "text"
+                ].strip()
         except Exception as exc:
             print("Translation failed:", exc)
             return text
