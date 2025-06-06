@@ -74,6 +74,9 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         for lbl in (esp_label, arrow_label, eng_label):
             lbl.setStyleSheet("font-size: 14px; color: black;")
             lbl.setAlignment(QtCore.Qt.AlignCenter)
+            lbl.setSizePolicy(
+                QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
+            )
         lang_row.addWidget(esp_label)
         lang_row.addSpacing(6)
         lang_row.addWidget(arrow_label)
@@ -94,12 +97,19 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         card_layout.setContentsMargins(16, 12, 16, 12)
         card_layout.setSpacing(8)
 
-        self.input_edit = QtWidgets.QLineEdit()
-        self.input_edit.setText("Hola, ¿cómo estás?")
-        # Only translate after the user presses Enter
-        self.input_edit.returnPressed.connect(self.translate_current_text)
+        self.input_edit = QtWidgets.QPlainTextEdit()
+        self.input_edit.setPlainText("Hola, ¿cómo estás?")
+        self.input_edit.setSizePolicy(
+            QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
+        )
+        shortcut = QtGui.QShortcut(
+            QtGui.QKeySequence("Ctrl+Return"), self.input_edit
+        )
+        shortcut.activated.connect(self.translate_current_text)
+        shortcut2 = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Enter"), self.input_edit)
+        shortcut2.activated.connect(self.translate_current_text)
         self.input_edit.setStyleSheet(
-            "QLineEdit {"
+            "QPlainTextEdit {"
             "color: black;"
             "font-weight: bold;"
             "border: none;"
@@ -112,6 +122,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.translated_label.setStyleSheet(
             "color: blue; font-size: 16px; font-weight: bold;"
         )
+        self.translated_label.setWordWrap(True)
         bottom_row = QtWidgets.QHBoxLayout()
         bottom_row.addWidget(self.translated_label)
         bottom_row.addStretch()
@@ -152,7 +163,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
     def translate_current_text(self):
         """Handle the Enter key press from the input box."""
-        self.on_text_changed(self.input_edit.text())
+        self.on_text_changed(self.input_edit.toPlainText())
 
     def translate_text(self, text):
         """Translate Spanish text to English using Gemini."""
