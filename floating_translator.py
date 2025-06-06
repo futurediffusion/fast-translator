@@ -2,10 +2,10 @@
 
 from PySide6 import QtCore, QtGui, QtWidgets
 import json
-from urllib import request, parse
+from urllib import request
 
-# User-provided Google API key for translation
-GOOGLE_API_KEY = "AIzaSyBQG_h_E_p9g7QvPpiiCt_qyiChmNNI6dE"
+# API key for Google's Gemini generative language API
+GEMINI_API_KEY = "AIzaSyDnO8MO4qFgkOcSO2eHVZkfQ7cZ2KhrA5I"
 
 class FloatingTranslatorWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -123,23 +123,21 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.translated_label.setText(translated)
 
     def translate_text(self, text):
-        """Translate Spanish text to English using Google API."""
-        params = {
-            "q": text,
-            "target": "en",
-            "source": "es",
-            "format": "text",
-            "key": GOOGLE_API_KEY,
-        }
+        """Translate Spanish text to English using Gemini."""
+        prompt = f"Translate the following Spanish text to English: {text}"
+        payload = json.dumps({
+            "contents": [{"parts": [{"text": prompt}]}]
+        }).encode()
         try:
-            data = parse.urlencode(params).encode()
             req = request.Request(
-                "https://translation.googleapis.com/language/translate/v2",
-                data=data,
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
             )
             with request.urlopen(req) as resp:
-                payload = json.loads(resp.read().decode())
-                return payload["data"]["translations"][0]["translatedText"]
+                data = json.loads(resp.read().decode())
+                return data["candidates"][0]["content"]["parts"][0]["text"].strip()
         except Exception as exc:
             print("Translation failed:", exc)
             return text
