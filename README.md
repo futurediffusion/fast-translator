@@ -29,6 +29,10 @@ translation enclosed in double asterisks (for example `**hola**`).
 The application filters the response to display only the text inside the
 asterisks.
 
+Translations are executed on a global `QThreadPool` so threads are reused
+between requests. This keeps the user interface responsive while avoiding the
+overhead of creating new threads for every translation.
+
 Previous translations are stored in `translation_cache.json` so frequent
 requests are reused without contacting the API. A small delay is also applied
 between requests and the application automatically retries when the API

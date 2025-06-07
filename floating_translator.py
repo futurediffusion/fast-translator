@@ -202,17 +202,19 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
     return text
 
 
-class TranslationWorker(QtCore.QThread):
-    """Thread to run translations without blocking the UI."""
+class TranslationTask(QtCore.QObject, QtCore.QRunnable):
+    """Runnable task that performs a translation on a thread pool."""
 
     translation_ready = QtCore.Signal(str)
 
     def __init__(self, text: str, source_lang: str, target_lang: str) -> None:
-        super().__init__()
+        QtCore.QObject.__init__(self)
+        QtCore.QRunnable.__init__(self)
         self.text = text
         self.source_lang = source_lang
         self.target_lang = target_lang
 
+    @QtCore.Slot()
     def run(self) -> None:  # pragma: no cover - involves network
         translated = translate_text(self.text, self.source_lang, self.target_lang)
         self.translation_ready.emit(translated)
@@ -236,8 +238,8 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.loading_timer.setInterval(500)
         self.loading_timer.timeout.connect(self._update_loading_dots)
         self._loading_step = 0
-        self.workers: list[TranslationWorker] = []
-        self.worker: TranslationWorker | None = None
+        self.thread_pool = QtCore.QThreadPool.globalInstance()
+        self.tasks: list[TranslationTask] = []
 
     def init_ui(self):
         # Main container with rounded corners and translucent background
@@ -439,18 +441,17 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
         self.settings_btn = QtWidgets.QPushButton("\u2699")
         self.settings_btn.setObjectName("settings")
-        self.settings_btn.setFixedSize(32, 32)
+        self.settings_btn.setFixedSize(24, 24)
         self.settings_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.settings_btn.clicked.connect(self.show_settings)
         self.settings_btn.setStyleSheet(
             "QPushButton#settings {"
-            "background-color: #2196F3;"
-            "color: white;"
-            "border-radius: 16px;"
+            "background: transparent;"
             "border: none;"
-            "font-size: 18px;"
+            "color: #2196F3;"
+            "font-size: 16px;"
             "}"
-            "QPushButton#settings:hover { background-color: #42a5f5; }"
+            "QPushButton#settings:hover { color: #42a5f5; }"
         )
         grip_row.addWidget(self.settings_btn)
 
@@ -506,6 +507,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         font = link.font()
         font.setPointSize(8)
         link.setFont(font)
+        link.setStyleSheet("color: #2196F3;")
         layout.addWidget(link)
 
     def show_settings(self):
@@ -528,20 +530,17 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self._loading_step = 0
         self._update_loading_dots()
         self.loading_timer.start()
-        worker = TranslationWorker(text, self.source_lang, self.target_lang)
-        worker.translation_ready.connect(self._display_translation)
-        worker.finished.connect(lambda w=worker: self._cleanup_worker(w))
-        self.workers.append(worker)
-        self.worker = worker
-        worker.start()
+        task = TranslationTask(text, self.source_lang, self.target_lang)
+        task.setAutoDelete(True)
+        task.translation_ready.connect(self._display_translation)
+        task.translation_ready.connect(lambda _=None, t=task: self._cleanup_task(t))
+        self.tasks.append(task)
+        self.thread_pool.start(task)
 
-    def _cleanup_worker(self, worker: TranslationWorker) -> None:
-        """Remove finished worker from the list and delete it."""
-        if worker in self.workers:
-            self.workers.remove(worker)
-        if self.worker is worker:
-            self.worker = None
-        worker.deleteLater()
+    def _cleanup_task(self, task: TranslationTask) -> None:
+        """Remove finished task from the list."""
+        if task in self.tasks:
+            self.tasks.remove(task)
 
     def _display_translation(self, text: str) -> None:
         """Stop the loading animation and show the translated text."""
@@ -603,10 +602,8 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.offset = None
 
     def closeEvent(self, event):
-        """Wait for any running workers before closing."""
-        for worker in list(self.workers):
-            if worker.isRunning():
-                worker.wait()
+        """Wait for running translation tasks before closing."""
+        self.thread_pool.waitForDone()
         super().closeEvent(event)
 
 
