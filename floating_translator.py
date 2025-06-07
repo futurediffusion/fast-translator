@@ -205,6 +205,10 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.source_lang = "es"
         self.target_lang = "en"
         self.init_ui()
+        self.loading_timer = QtCore.QTimer(self)
+        self.loading_timer.setInterval(500)
+        self.loading_timer.timeout.connect(self._update_loading_dots)
+        self._loading_step = 0
 
     def init_ui(self):
         # Main container with rounded corners and translucent background
@@ -406,12 +410,25 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         grip_row.addWidget(self.size_grip)
         main_layout.addLayout(grip_row)
 
+    def _update_loading_dots(self) -> None:
+        """Update the loading indicator with an animated ellipsis."""
+        self._loading_step = (self._loading_step + 1) % 4
+        dots = "." * self._loading_step
+        self.translated_label.setText(dots)
+
     def on_text_changed(self, text: str) -> None:
         """Translate the provided text asynchronously."""
-        self.translated_label.setText("...")
+        self._loading_step = 0
+        self._update_loading_dots()
+        self.loading_timer.start()
         self.worker = TranslationWorker(text, self.source_lang, self.target_lang)
-        self.worker.translation_ready.connect(self.translated_label.setText)
+        self.worker.translation_ready.connect(self._display_translation)
         self.worker.start()
+
+    def _display_translation(self, text: str) -> None:
+        """Stop the loading animation and show the translated text."""
+        self.loading_timer.stop()
+        self.translated_label.setText(text)
 
     def swap_languages(self):
         """Swap source and target languages."""

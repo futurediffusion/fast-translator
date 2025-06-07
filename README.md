@@ -33,6 +33,9 @@ requests are reused without contacting the API. A small delay is also applied
 between requests and the application automatically retries when the API
 responds with HTTP 429 errors.
 
+While the translation is in progress, the output label shows an animated
+ellipsis to indicate activity.
+
 Press `Ctrl+Enter` (or `Ctrl+Return`) inside the input box to send the text
 for translation. The input field supports multiple lines so you can type
 longer passages.
