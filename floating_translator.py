@@ -277,8 +277,19 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "}"
             "QPushButton#swap:hover { color: blue; }"
         )
+        combo_style = (
+            "QComboBox {"
+            "font-size: 14px;"
+            "color: black;"
+            "background-color: white;"
+            "}"
+            "QComboBox QAbstractItemView {"
+            "color: black;"
+            "background-color: white;"
+            "}"
+        )
         for combo in (self.src_combo, self.dest_combo):
-            combo.setStyleSheet("font-size: 14px; color: black;")
+            combo.setStyleSheet(combo_style)
             combo.setSizePolicy(
                 QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
             )
