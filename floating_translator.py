@@ -14,6 +14,25 @@ except Exception:  # pragma: no cover - optional dependency
 # API key for Google's Gemini generative language API
 GEMINI_API_KEY = "AIzaSyDnO8MO4qFgkOcSO2eHVZkfQ7cZ2KhrA5I"
 
+# Language options for the UI and prompt names used by the API
+LANG_OPTIONS = [
+    ("Español", "es"),
+    ("Inglés", "en"),
+    ("Francés", "fr"),
+    ("Alemán", "de"),
+    ("Italiano", "it"),
+    ("Portugués", "pt"),
+]
+
+LANG_PROMPT_NAMES = {
+    "es": "Spanish",
+    "en": "English",
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
+    "pt": "Portuguese",
+}
+
 
 def clean_translation(text: str) -> str:
     """Return a simplified single-line translation."""
@@ -32,20 +51,13 @@ def clean_translation(text: str) -> str:
 
 def translate_text(text: str, source_lang: str, target_lang: str) -> str:
     """Translate text using Gemini API."""
-    if source_lang == "es":
-        prompt = (
-            "Translate the following Spanish text to English as a single"
-            " concise phrase. Respond only with the English translation"
-            " wrapped in double asterisks.\n\nSpanish: "
-            f"{text}"
-        )
-    else:
-        prompt = (
-            "Translate the following English text to Spanish as a single"
-            " concise phrase. Respond only with the Spanish translation"
-            " wrapped in double asterisks.\n\nEnglish: "
-            f"{text}"
-        )
+    src_name = LANG_PROMPT_NAMES.get(source_lang, source_lang)
+    tgt_name = LANG_PROMPT_NAMES.get(target_lang, target_lang)
+    prompt = (
+        f"Translate the following {src_name} text to {tgt_name} as a single"
+        f" concise phrase. Respond only with the {tgt_name} translation"
+        f" wrapped in double asterisks.\n\n{src_name}: {text}"
+    )
     payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode()
     try:
         req = request.Request(
@@ -147,7 +159,21 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         # Language row
         lang_row = QtWidgets.QHBoxLayout()
         lang_row.setAlignment(QtCore.Qt.AlignCenter)
-        self.src_label = QtWidgets.QLabel("Espa\u00f1ol")
+
+        self.src_combo = QtWidgets.QComboBox()
+        self.dest_combo = QtWidgets.QComboBox()
+        for label, code in LANG_OPTIONS:
+            self.src_combo.addItem(label, code)
+            self.dest_combo.addItem(label, code)
+        self.src_combo.currentIndexChanged.connect(
+            lambda idx: setattr(self, "source_lang", self.src_combo.itemData(idx))
+        )
+        self.dest_combo.currentIndexChanged.connect(
+            lambda idx: setattr(self, "target_lang", self.dest_combo.itemData(idx))
+        )
+        self.src_combo.setCurrentIndex(0)
+        self.dest_combo.setCurrentIndex(1)
+
         self.swap_btn = QtWidgets.QPushButton("\u2192")
         self.swap_btn.setObjectName("swap")
         self.swap_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
@@ -161,18 +187,16 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "}"
             "QPushButton#swap:hover { color: blue; }"
         )
-        self.dest_label = QtWidgets.QLabel("Ingl\u00e9s")
-        for lbl in (self.src_label, self.dest_label):
-            lbl.setStyleSheet("font-size: 14px; color: black;")
-            lbl.setAlignment(QtCore.Qt.AlignCenter)
-            lbl.setSizePolicy(
+        for combo in (self.src_combo, self.dest_combo):
+            combo.setStyleSheet("font-size: 14px; color: black;")
+            combo.setSizePolicy(
                 QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed
             )
-        lang_row.addWidget(self.src_label)
+        lang_row.addWidget(self.src_combo)
         lang_row.addSpacing(6)
         lang_row.addWidget(self.swap_btn)
         lang_row.addSpacing(6)
-        lang_row.addWidget(self.dest_label)
+        lang_row.addWidget(self.dest_combo)
         main_layout.addLayout(lang_row)
 
         # Translation card
@@ -257,15 +281,10 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
     def swap_languages(self):
         """Swap source and target languages."""
-        self.source_lang, self.target_lang = self.target_lang, self.source_lang
-        if self.source_lang == "es":
-            self.src_label.setText("Espa\u00f1ol")
-            self.dest_label.setText("Ingl\u00e9s")
-            self.swap_btn.setText("\u2192")
-        else:
-            self.src_label.setText("Ingl\u00e9s")
-            self.dest_label.setText("Espa\u00f1ol")
-            self.swap_btn.setText("\u2192")
+        src_index = self.src_combo.currentIndex()
+        dest_index = self.dest_combo.currentIndex()
+        self.src_combo.setCurrentIndex(dest_index)
+        self.dest_combo.setCurrentIndex(src_index)
 
     def translate_current_text(self):
         """Handle the Enter key press from the input box."""

@@ -1,7 +1,8 @@
 # fast-translator
 
 A small PySide6 application that floats above other windows and translates
-Spanish text into English using Google's Gemini generative language API.
+text between languages using Google's Gemini generative language API. Choose
+the source and target languages from the drop-down menus.
 
 ## Installation
 
@@ -22,8 +23,8 @@ python floating_translator.py
 The application contains a built-in example API key, but you can modify the
 `GEMINI_API_KEY` constant in `floating_translator.py` to use your own.
 
-The translator prompts the Gemini API to respond with the English
-translation enclosed in double asterisks (for example `**hello**`).
+The translator prompts the Gemini API to respond with the target-language
+translation enclosed in double asterisks (for example `**hola**`).
 The application filters the response to display only the text inside the
 asterisks.
 
