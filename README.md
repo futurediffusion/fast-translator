@@ -2,7 +2,9 @@
 
 A small PySide6 application that floats above other windows and translates
 text between languages using Google's Gemini generative language API. Choose
-the source and target languages from the drop-down menus.
+the source and target languages from the drop-down menus. The source list now
+includes an "Detectar" option for automatic language detection and several
+additional languages such as Chinese, Japanese and Russian.
 
 ## Installation
 
