@@ -142,6 +142,19 @@ def export_translation_history(path: str) -> None:
     except Exception as exc:  # pragma: no cover - best effort
         print("Could not export history:", exc)
 
+
+def remove_translation_item(translation: str) -> None:
+    """Delete a single translation from the cache."""
+    keys = [
+        key
+        for key, val in list(_translation_cache.items())
+        if val.get("translation") == translation
+    ]
+    for key in keys:
+        _translation_cache.pop(key, None)
+    if keys:
+        _save_cache()
+
 # Language options for the UI and prompt names used by the API
 LANG_OPTIONS = [
     ("Español", "es"),
@@ -625,43 +638,81 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         clipboard = QtWidgets.QApplication.clipboard()
         clipboard.setText(self.translated_label.text())
 
+    def _delete_history_item(self, translation: str, menu: QtWidgets.QMenu) -> None:
+        """Remove a translation entry and refresh the menu."""
+        remove_translation_item(translation)
+        menu.close()
+        self.show_history_menu()
+
+    def _select_history_item(self, translation: str, menu: QtWidgets.QMenu) -> None:
+        """Copy the chosen translation and close the menu."""
+        self.translated_label.setText(translation)
+        clipboard = QtWidgets.QApplication.clipboard()
+        clipboard.setText(translation)
+        menu.close()
+
+    def _clear_history(self, menu: QtWidgets.QMenu) -> None:
+        """Clear all history entries and close the menu."""
+        clear_translation_history()
+        self.translated_label.setText("")
+        menu.close()
+
+    def _export_history(self, menu: QtWidgets.QMenu) -> None:
+        """Export translation history and close the menu."""
+        path, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self,
+            "Export History",
+            "translation_history.txt",
+            "Text Files (*.txt);;All Files (*)",
+        )
+        if path:
+            export_translation_history(path)
+        menu.close()
+
     def show_history_menu(self):
         menu = QtWidgets.QMenu(self)
-        for translation, count in get_translation_history():
-            action = menu.addAction(f"{translation} ({count})")
-            action.setData(translation)
-        has_history = bool(menu.actions())
-        if not has_history:
+        history = get_translation_history()
+        for translation, count in history:
+            widget = QtWidgets.QWidget()
+            layout = QtWidgets.QHBoxLayout(widget)
+            layout.setContentsMargins(4, 2, 4, 2)
+            select_btn = QtWidgets.QToolButton(widget)
+            select_btn.setText(f"{translation} ({count})")
+            select_btn.setStyleSheet(
+                "QToolButton { border: none; text-align: left; padding: 0px; }"
+            )
+            select_btn.clicked.connect(
+                lambda _=None, t=translation, m=menu: self._select_history_item(t, m)
+            )
+            del_btn = QtWidgets.QToolButton(widget)
+            del_btn.setText("\u2715")
+            del_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+            del_btn.setStyleSheet(
+                "QToolButton { border: none; color: red; font-weight: bold; }"
+                "QToolButton:hover { color: #ff6666; }"
+            )
+            del_btn.clicked.connect(
+                lambda _=None, t=translation, m=menu: self._delete_history_item(t, m)
+            )
+            layout.addWidget(select_btn)
+            layout.addStretch()
+            layout.addWidget(del_btn)
+            action = QtWidgets.QWidgetAction(menu)
+            action.setDefaultWidget(widget)
+            menu.addAction(action)
+        if not history:
             menu.addAction("(no history)")
-        if has_history:
+        else:
             menu.addSeparator()
         export_action = menu.addAction("Export history...")
         clear_action = menu.addAction("Clear history")
 
-        action = menu.exec(
+        export_action.triggered.connect(lambda: self._export_history(menu))
+        clear_action.triggered.connect(lambda: self._clear_history(menu))
+
+        menu.exec(
             self.history_btn.mapToGlobal(QtCore.QPoint(0, self.history_btn.height()))
         )
-        if not action:
-            return
-        if action == clear_action:
-            clear_translation_history()
-            self.translated_label.setText("")
-            return
-        if action == export_action:
-            path, _ = QtWidgets.QFileDialog.getSaveFileName(
-                self,
-                "Export History",
-                "translation_history.txt",
-                "Text Files (*.txt);;All Files (*)",
-            )
-            if path:
-                export_translation_history(path)
-            return
-        if action.data():
-            selected = action.data()
-            self.translated_label.setText(selected)
-            clipboard = QtWidgets.QApplication.clipboard()
-            clipboard.setText(selected)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
