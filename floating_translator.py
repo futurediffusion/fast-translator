@@ -209,6 +209,8 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.loading_timer.setInterval(500)
         self.loading_timer.timeout.connect(self._update_loading_dots)
         self._loading_step = 0
+        self.workers: list[TranslationWorker] = []
+        self.worker: TranslationWorker | None = None
 
     def init_ui(self):
         # Main container with rounded corners and translucent background
@@ -422,9 +424,20 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self._loading_step = 0
         self._update_loading_dots()
         self.loading_timer.start()
-        self.worker = TranslationWorker(text, self.source_lang, self.target_lang)
-        self.worker.translation_ready.connect(self._display_translation)
-        self.worker.start()
+        worker = TranslationWorker(text, self.source_lang, self.target_lang)
+        worker.translation_ready.connect(self._display_translation)
+        worker.finished.connect(lambda w=worker: self._cleanup_worker(w))
+        self.workers.append(worker)
+        self.worker = worker
+        worker.start()
+
+    def _cleanup_worker(self, worker: TranslationWorker) -> None:
+        """Remove finished worker from the list and delete it."""
+        if worker in self.workers:
+            self.workers.remove(worker)
+        if self.worker is worker:
+            self.worker = None
+        worker.deleteLater()
 
     def _display_translation(self, text: str) -> None:
         """Stop the loading animation and show the translated text."""
@@ -484,6 +497,13 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
     def mouseReleaseEvent(self, event):
         self.offset = None
+
+    def closeEvent(self, event):
+        """Wait for any running workers before closing."""
+        for worker in list(self.workers):
+            if worker.isRunning():
+                worker.wait()
+        super().closeEvent(event)
 
 
 if __name__ == "__main__":
