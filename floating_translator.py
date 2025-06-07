@@ -226,19 +226,19 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         # Close button
         self.close_btn = QtWidgets.QPushButton("\u2715", self.container)
         self.close_btn.setObjectName("close")
-        self.close_btn.setFixedSize(16, 16)
+        self.close_btn.setFixedSize(24, 24)
         self.close_btn.clicked.connect(self.close)
         self.close_btn.setStyleSheet(
             "QPushButton#close {"
             "border: none;"
-            "color: white;"
-            "background-color: red;"
-            "border-radius: 8px;"
+            "background: transparent;"
+            "color: red;"
             "font-weight: bold;"
+            "font-size: 18px;"
             "}"
-            "QPushButton#close:hover { background-color: #ff6666; }"
+            "QPushButton#close:hover { color: #ff6666; }"
         )
-        self.close_btn.move(self.width() - 24, 8)
+        self.close_btn.move(self.width() - 32, 8)
 
         main_layout = QtWidgets.QVBoxLayout(self.container)
         main_layout.setContentsMargins(20, 20, 20, 20)
@@ -362,7 +362,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         bottom_row.addWidget(self.translated_label)
         bottom_row.addStretch()
 
-        self.copy_btn = QtWidgets.QPushButton()
+        self.copy_btn = QtWidgets.QPushButton("\U0001F4CB")
         self.copy_btn.setObjectName("copy")
         self.copy_btn.setFixedSize(32, 32)
         self.copy_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
@@ -373,13 +373,10 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "color: white;"
             "border-radius: 16px;"
             "border: none;"
+            "font-size: 18px;"
             "}"
             "QPushButton#copy:hover { background-color: #42a5f5; }"
         )
-        copy_icon = self.style().standardIcon(
-            QtWidgets.QStyle.SP_DialogOpenButton
-        )
-        self.copy_btn.setIcon(copy_icon)
         bottom_row.addWidget(self.copy_btn)
 
         self.history_btn = QtWidgets.QPushButton("\u25BC")
@@ -455,7 +452,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.container.setGeometry(0, 0, self.width(), self.height())
-        self.close_btn.move(self.width() - 24, 8)
+        self.close_btn.move(self.width() - 32, 8)
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
