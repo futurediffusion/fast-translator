@@ -277,9 +277,10 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "border: none;"
             "background: transparent;"
             "font-size: 14px;"
-            "color: black;"
+            "font-weight: bold;"
+            "color: #2196F3;"
             "}"
-            "QPushButton#swap:hover { color: blue; }"
+            "QPushButton#swap:hover { color: #42a5f5; }"
         )
         combo_style = (
             "QComboBox {"
@@ -442,6 +443,8 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.on_text_changed(self.input_edit.toPlainText())
 
     def language_changed(self, *args):
+        if not hasattr(self, "input_edit"):
+            return
         text = self.input_edit.toPlainText().strip()
         if text:
             self.on_text_changed(text)
@@ -459,7 +462,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             action.setData(translation)
         if not menu.actions():
             menu.addAction("(no history)")
-        action = menu.exec_(self.history_btn.mapToGlobal(QtCore.QPoint(0, self.history_btn.height())))
+        action = menu.exec(self.history_btn.mapToGlobal(QtCore.QPoint(0, self.history_btn.height())))
         if action and action.data():
             selected = action.data()
             self.translated_label.setText(selected)
@@ -473,11 +476,11 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
-            self.offset = event.pos()
+            self.offset = event.position().toPoint()
 
     def mouseMoveEvent(self, event):
         if self.offset is not None and event.buttons() & QtCore.Qt.LeftButton:
-            self.move(event.globalPos() - self.offset)
+            self.move(event.globalPosition().toPoint() - self.offset)
 
     def mouseReleaseEvent(self, event):
         self.offset = None
