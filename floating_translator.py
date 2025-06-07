@@ -213,7 +213,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.container.setStyleSheet(
             "#container {"
             "background-color: rgba(255, 255, 255, 0.85);"
-            "border-radius: 32px;"
+            "border-radius: 24px;"
             "}"
         )
         self.container.setGeometry(0, 0, self.width(), self.height())
@@ -259,6 +259,8 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.dest_combo.currentIndexChanged.connect(
             lambda idx: setattr(self, "target_lang", self.dest_combo.itemData(idx))
         )
+        self.src_combo.currentIndexChanged.connect(self.language_changed)
+        self.dest_combo.currentIndexChanged.connect(self.language_changed)
         self.src_combo.setCurrentIndex(0)
         self.dest_combo.setCurrentIndex(1)
 
@@ -301,7 +303,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         card_layout.setSpacing(8)
 
         self.input_edit = QtWidgets.QPlainTextEdit()
-        self.input_edit.setPlainText("Hola, ¿cómo estás?")
+        self.input_edit.setPlaceholderText("Escribe tu texto")
         self.input_edit.setSizePolicy(
             QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding
         )
@@ -320,10 +322,29 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "font-size: 16px;"
             "}"
         )
-        self.translated_label = QtWidgets.QLabel("Hello, how are you?")
-        # Show translations in blue for better visibility
+
+        self.translate_btn = QtWidgets.QPushButton("\u2192")
+        self.translate_btn.setObjectName("translate")
+        self.translate_btn.setFixedSize(32, 32)
+        self.translate_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.translate_btn.clicked.connect(self.translate_current_text)
+        self.translate_btn.setStyleSheet(
+            "QPushButton#translate {"
+            "background-color: #2196F3;"
+            "color: white;"
+            "border-radius: 16px;"
+            "border: none;"
+            "font-size: 16px;"
+            "}"
+            "QPushButton#translate:hover { background-color: #42a5f5; }"
+        )
+
+        input_row = QtWidgets.QHBoxLayout()
+        input_row.addWidget(self.input_edit)
+        input_row.addWidget(self.translate_btn)
+        self.translated_label = QtWidgets.QLabel("")
         self.translated_label.setStyleSheet(
-            "color: blue; font-size: 16px; font-weight: bold;"
+            "color: #2196F3; font-size: 16px; font-weight: bold;"
         )
         self.translated_label.setWordWrap(True)
         bottom_row = QtWidgets.QHBoxLayout()
@@ -337,11 +358,12 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.copy_btn.clicked.connect(self.copy_translation)
         self.copy_btn.setStyleSheet(
             "QPushButton#copy {"
-            "background-color: #D9EEFF;"
+            "background-color: #2196F3;"
+            "color: white;"
             "border-radius: 16px;"
             "border: none;"
             "}"
-            "QPushButton#copy:hover { background-color: #cce4ff; }"
+            "QPushButton#copy:hover { background-color: #42a5f5; }"
         )
         copy_icon = self.style().standardIcon(
             QtWidgets.QStyle.SP_DialogOpenButton
@@ -356,15 +378,16 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.history_btn.clicked.connect(self.show_history_menu)
         self.history_btn.setStyleSheet(
             "QPushButton#history {"
-            "background-color: #D9EEFF;"
+            "background-color: #2196F3;"
+            "color: white;"
             "border-radius: 16px;"
             "border: none;"
             "}"
-            "QPushButton#history:hover { background-color: #cce4ff; }"
+            "QPushButton#history:hover { background-color: #42a5f5; }"
         )
         bottom_row.addWidget(self.history_btn)
 
-        card_layout.addWidget(self.input_edit)
+        card_layout.addLayout(input_row)
         card_layout.addLayout(bottom_row)
 
         main_layout.addWidget(card)
@@ -392,6 +415,11 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
     def translate_current_text(self):
         """Handle the Enter key press from the input box."""
         self.on_text_changed(self.input_edit.toPlainText())
+
+    def language_changed(self, *args):
+        text = self.input_edit.toPlainText().strip()
+        if text:
+            self.on_text_changed(text)
 
 
 
