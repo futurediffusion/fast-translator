@@ -15,6 +15,8 @@ except Exception:  # pragma: no cover - optional dependency
 
 # API key for Google's Gemini generative language API
 GEMINI_API_KEY = ""
+THEME = "light"
+FONT_SIZE = 16
 
 # Optional config file storing the API key
 CONFIG_FILE = "config.json"
@@ -24,6 +26,8 @@ if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
             GEMINI_API_KEY = data.get("api_key", "")
+            THEME = data.get("theme", THEME)
+            FONT_SIZE = int(data.get("font_size", FONT_SIZE))
     except Exception as exc:  # pragma: no cover - best effort
         print("Could not load config:", exc)
 
@@ -93,10 +97,17 @@ def _save_cache() -> None:
 
 
 def save_config() -> None:
-    """Persist the API key to disk."""
+    """Persist the configuration options to disk."""
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump({"api_key": GEMINI_API_KEY}, f)
+            json.dump(
+                {
+                    "api_key": GEMINI_API_KEY,
+                    "theme": THEME,
+                    "font_size": FONT_SIZE,
+                },
+                f,
+            )
     except Exception as exc:  # pragma: no cover - best effort
         print("Could not save config:", exc)
 
@@ -105,6 +116,20 @@ def set_api_key(key: str) -> None:
     """Update the API key and save it."""
     global GEMINI_API_KEY
     GEMINI_API_KEY = key.strip()
+    save_config()
+
+
+def set_theme(value: str) -> None:
+    """Update the theme and save it."""
+    global THEME
+    THEME = value
+    save_config()
+
+
+def set_font_size(value: int) -> None:
+    """Update the font size and save it."""
+    global FONT_SIZE
+    FONT_SIZE = int(value)
     save_config()
 
 
@@ -300,6 +325,8 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.offset = None
         self.source_lang = "es"
         self.target_lang = "en"
+        self.dark_mode = THEME == "dark"
+        self.font_size = FONT_SIZE
         self.init_ui()
         self.loading_timer = QtCore.QTimer(self)
         self.loading_timer.setInterval(500)
@@ -325,7 +352,22 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         effect.setColor(QtGui.QColor(0, 0, 0, 80))
         self.container.setGraphicsEffect(effect)
 
-        # Close button
+        # Minimize and close buttons
+        self.minimize_btn = QtWidgets.QPushButton("\u2013", self.container)
+        self.minimize_btn.setObjectName("minimize")
+        self.minimize_btn.setFixedSize(24, 24)
+        self.minimize_btn.clicked.connect(self.showMinimized)
+        self.minimize_btn.setStyleSheet(
+            "QPushButton#minimize {"
+            "border: none;"
+            "background: transparent;"
+            "color: #2196F3;"
+            "font-weight: bold;"
+            "font-size: 18px;"
+            "}"
+            "QPushButton#minimize:hover { color: #64b5f6; }"
+        )
+
         self.close_btn = QtWidgets.QPushButton("\u2715", self.container)
         self.close_btn.setObjectName("close")
         self.close_btn.setFixedSize(24, 24)
@@ -340,6 +382,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
             "}"
             "QPushButton#close:hover { color: #ff6666; }"
         )
+        self.minimize_btn.move(self.width() - 64, 8)
         self.close_btn.move(self.width() - 32, 8)
 
         main_layout = QtWidgets.QVBoxLayout(self.container)
@@ -404,15 +447,15 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         main_layout.addLayout(lang_row)
 
         # Translation card
-        card = QtWidgets.QFrame()
-        card.setObjectName("card")
-        card.setStyleSheet(
+        self.card = QtWidgets.QFrame()
+        self.card.setObjectName("card")
+        self.card.setStyleSheet(
             "#card {"
             "background-color: rgba(255, 255, 255, 0.85);"
             "border-radius: 24px;"
             "}"
         )
-        card_layout = QtWidgets.QVBoxLayout(card)
+        card_layout = QtWidgets.QVBoxLayout(self.card)
         card_layout.setContentsMargins(16, 12, 16, 12)
         card_layout.setSpacing(8)
 
@@ -427,6 +470,8 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         shortcut.activated.connect(self.translate_current_text)
         shortcut2 = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+Enter"), self.input_edit)
         shortcut2.activated.connect(self.translate_current_text)
+        shortcut_copy = QtGui.QShortcut(QtGui.QKeySequence("Ctrl+C"), self.input_edit)
+        shortcut_copy.activated.connect(self.copy_translation)
         self.input_edit.setStyleSheet(
             "QPlainTextEdit {"
             "color: black;"
@@ -501,7 +546,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         card_layout.addLayout(input_row)
         card_layout.addLayout(bottom_row)
 
-        main_layout.addWidget(card)
+        main_layout.addWidget(self.card)
 
         grip_row = QtWidgets.QHBoxLayout()
         grip_row.addStretch()
@@ -527,6 +572,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         main_layout.addLayout(grip_row)
 
         self._init_settings_popup()
+        self.apply_theme()
 
     def _init_settings_popup(self) -> None:
         self.settings_popup = QtWidgets.QFrame(self, QtCore.Qt.Popup)
@@ -567,18 +613,77 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         )
         layout.addWidget(self.api_key_edit)
 
-        link = QtWidgets.QLabel(
+        self.api_link = QtWidgets.QLabel(
             '<a href="https://aistudio.google.com/app/apikey">consigue tu api key aqui</a>'
         )
-        link.setOpenExternalLinks(True)
-        font = link.font()
+        self.api_link.setOpenExternalLinks(True)
+        font = self.api_link.font()
         font.setPointSize(8)
-        link.setFont(font)
-        link.setStyleSheet("color: #2196F3;")
-        layout.addWidget(link)
+        self.api_link.setFont(font)
+        self.api_link.setStyleSheet("color: #2196F3;")
+        layout.addWidget(self.api_link)
+
+        self.dark_checkbox = QtWidgets.QCheckBox("Modo oscuro")
+        self.dark_checkbox.setChecked(THEME == "dark")
+        self.dark_checkbox.stateChanged.connect(lambda _=None: self._on_theme_changed())
+        layout.addWidget(self.dark_checkbox)
+
+        font_row = QtWidgets.QHBoxLayout()
+        font_row.addWidget(QtWidgets.QLabel("Tama\u00f1o fuente"))
+        self.font_spin = QtWidgets.QSpinBox()
+        self.font_spin.setRange(10, 24)
+        self.font_spin.setValue(FONT_SIZE)
+        self.font_spin.valueChanged.connect(self._on_font_changed)
+        font_row.addWidget(self.font_spin)
+        layout.addLayout(font_row)
+
+    def _on_theme_changed(self) -> None:
+        self.dark_mode = self.dark_checkbox.isChecked()
+        set_theme("dark" if self.dark_mode else "light")
+        self.apply_theme()
+
+    def _on_font_changed(self) -> None:
+        self.font_size = self.font_spin.value()
+        set_font_size(self.font_size)
+        self.apply_theme()
+
+    def apply_theme(self) -> None:
+        if self.dark_mode:
+            container_bg = "rgba(40,40,40,0.85)"
+            card_bg = "rgba(55,55,55,0.85)"
+            text_color = "white"
+            combo_bg = "#333333"
+            link_color = "white"
+        else:
+            container_bg = "rgba(255,255,255,0.85)"
+            card_bg = "rgba(255,255,255,0.85)"
+            text_color = "black"
+            combo_bg = "white"
+            link_color = "#2196F3"
+
+        self.container.setStyleSheet(
+            f"#container {{background-color: {container_bg}; border-radius: 24px;}}"
+        )
+        self.card.setStyleSheet(
+            f"#card {{background-color: {card_bg}; border-radius: 24px;}}"
+        )
+        for combo in (self.src_combo, self.dest_combo):
+            combo.setStyleSheet(
+                f"QComboBox {{font-size: 14px; color: {text_color}; background-color: {combo_bg};}}"
+                f"QComboBox QAbstractItemView {{color: {text_color}; background-color: {combo_bg};}}"
+            )
+        self.input_edit.setStyleSheet(
+            f"QPlainTextEdit {{color: {text_color}; font-weight: bold; border: none; background: transparent; font-size: {self.font_size}px;}}"
+        )
+        self.translated_label.setStyleSheet(
+            f"color: #2196F3; font-size: {self.font_size}px; font-weight: bold;"
+        )
+        self.api_link.setStyleSheet(f"color: {link_color};")
 
     def show_settings(self):
         self.api_key_edit.setText(GEMINI_API_KEY)
+        self.dark_checkbox.setChecked(self.dark_mode)
+        self.font_spin.setValue(self.font_size)
         self.settings_popup.adjustSize()
         pos = self.settings_btn.mapToGlobal(
             QtCore.QPoint(0, -self.settings_popup.height())
@@ -717,6 +822,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.container.setGeometry(0, 0, self.width(), self.height())
+        self.minimize_btn.move(self.width() - 64, 8)
         self.close_btn.move(self.width() - 32, 8)
 
     def mousePressEvent(self, event):
