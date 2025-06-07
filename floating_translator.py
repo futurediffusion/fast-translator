@@ -24,7 +24,7 @@ MIN_REQUEST_INTERVAL = 1.0
 LAST_REQUEST_TIME = 0.0
 
 # In-memory cache loaded from disk if available
-_translation_cache: dict[tuple[str, str, str], str] = {}
+_translation_cache: dict[tuple[str, str, str], dict[str, object]] = {}
 if os.path.exists(CACHE_FILE):
     try:
         with open(CACHE_FILE, "r", encoding="utf-8") as f:
@@ -32,7 +32,16 @@ if os.path.exists(CACHE_FILE):
         for key, value in data.items():
             parts = key.split("||")
             if len(parts) == 3:
-                _translation_cache[(parts[0], parts[1], parts[2])] = value
+                if isinstance(value, dict):
+                    _translation_cache[(parts[0], parts[1], parts[2])] = {
+                        "translation": value.get("translation", ""),
+                        "count": int(value.get("count", 0)),
+                    }
+                else:
+                    _translation_cache[(parts[0], parts[1], parts[2])] = {
+                        "translation": value,
+                        "count": 0,
+                    }
     except Exception as exc:  # pragma: no cover - best effort
         print("Could not load cache:", exc)
 
@@ -41,10 +50,25 @@ def _save_cache() -> None:
     """Persist the translation cache to disk."""
     try:
         with open(CACHE_FILE, "w", encoding="utf-8") as f:
-            data = {"||".join(k): v for k, v in _translation_cache.items()}
+            data = {
+                "||".join(k): {
+                    "translation": v.get("translation", ""),
+                    "count": int(v.get("count", 0)),
+                }
+                for k, v in _translation_cache.items()
+            }
             json.dump(data, f)
     except Exception as exc:  # pragma: no cover - best effort
         print("Could not save cache:", exc)
+
+
+def get_translation_history() -> list[tuple[str, int]]:
+    """Return cached translations ordered by most frequently used."""
+    items: list[tuple[str, int]] = []
+    for entry in _translation_cache.values():
+        items.append((entry.get("translation", ""), int(entry.get("count", 0))))
+    items.sort(key=lambda x: x[1], reverse=True)
+    return items
 
 # Language options for the UI and prompt names used by the API
 LANG_OPTIONS = [
@@ -94,7 +118,10 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
     """Translate text using Gemini API with caching and rate limiting."""
     key = (text, source_lang, target_lang)
     if key in _translation_cache:
-        return _translation_cache[key]
+        entry = _translation_cache[key]
+        entry["count"] = entry.get("count", 0) + 1
+        _save_cache()
+        return entry["translation"]
 
     src_name = LANG_PROMPT_NAMES.get(source_lang, source_lang)
     tgt_name = LANG_PROMPT_NAMES.get(target_lang, target_lang)
@@ -120,7 +147,7 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
                 )
                 if raw_text:
                     translated = clean_translation(raw_text)
-                    _translation_cache[key] = translated
+                    _translation_cache[key] = {"translation": translated, "count": 1}
                     _save_cache()
                     return translated
         except error.HTTPError as http_err:  # pragma: no cover - network
@@ -139,7 +166,7 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
             translated = translator.translate(
                 text, src=source_lang, dest=target_lang
             ).text
-            _translation_cache[key] = translated
+            _translation_cache[key] = {"translation": translated, "count": 1}
             _save_cache()
             return translated
         except Exception as fallback_exc:  # pragma: no cover - best effort
@@ -322,6 +349,21 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.copy_btn.setIcon(copy_icon)
         bottom_row.addWidget(self.copy_btn)
 
+        self.history_btn = QtWidgets.QPushButton("\u25BC")
+        self.history_btn.setObjectName("history")
+        self.history_btn.setFixedSize(32, 32)
+        self.history_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.history_btn.clicked.connect(self.show_history_menu)
+        self.history_btn.setStyleSheet(
+            "QPushButton#history {"
+            "background-color: #D9EEFF;"
+            "border-radius: 16px;"
+            "border: none;"
+            "}"
+            "QPushButton#history:hover { background-color: #cce4ff; }"
+        )
+        bottom_row.addWidget(self.history_btn)
+
         card_layout.addWidget(self.input_edit)
         card_layout.addLayout(bottom_row)
 
@@ -356,6 +398,20 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
     def copy_translation(self):
         clipboard = QtWidgets.QApplication.clipboard()
         clipboard.setText(self.translated_label.text())
+
+    def show_history_menu(self):
+        menu = QtWidgets.QMenu(self)
+        for translation, count in get_translation_history():
+            action = menu.addAction(f"{translation} ({count})")
+            action.setData(translation)
+        if not menu.actions():
+            menu.addAction("(no history)")
+        action = menu.exec_(self.history_btn.mapToGlobal(QtCore.QPoint(0, self.history_btn.height())))
+        if action and action.data():
+            selected = action.data()
+            self.translated_label.setText(selected)
+            clipboard = QtWidgets.QApplication.clipboard()
+            clipboard.setText(selected)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

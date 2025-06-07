@@ -36,3 +36,8 @@ responds with HTTP 429 errors.
 Press `Ctrl+Enter` (or `Ctrl+Return`) inside the input box to send the text
 for translation. The input field supports multiple lines so you can type
 longer passages.
+
+Click the small down-arrow button next to the copy icon to open the history
+menu. It lists previous translations ordered by how often each one has been
+used, showing a counter for every entry. Selecting an item copies the text to
+the clipboard and displays it again in the output label.
