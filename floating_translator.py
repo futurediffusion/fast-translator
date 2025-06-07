@@ -15,6 +15,82 @@ except Exception:  # pragma: no cover - optional dependency
 GEMINI_API_KEY = "AIzaSyDnO8MO4qFgkOcSO2eHVZkfQ7cZ2KhrA5I"
 
 
+def clean_translation(text: str) -> str:
+    """Return a simplified single-line translation."""
+    if not text:
+        return text
+    line = text.strip().splitlines()[0]
+    line = line.lstrip("*-• ").strip()
+    match = re.search(r"\*\*(.+?)\*\*", line)
+    if match:
+        return match.group(1).strip()
+    if line.startswith("**") and line.endswith("**"):
+        line = line[2:-2]
+    line = line.strip("*")
+    return line
+
+
+def translate_text(text: str, source_lang: str, target_lang: str) -> str:
+    """Translate text using Gemini API."""
+    if source_lang == "es":
+        prompt = (
+            "Translate the following Spanish text to English as a single"
+            " concise phrase. Respond only with the English translation"
+            " wrapped in double asterisks.\n\nSpanish: "
+            f"{text}"
+        )
+    else:
+        prompt = (
+            "Translate the following English text to Spanish as a single"
+            " concise phrase. Respond only with the Spanish translation"
+            " wrapped in double asterisks.\n\nEnglish: "
+            f"{text}"
+        )
+    payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode()
+    try:
+        req = request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode())
+            raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if raw_text:
+                return clean_translation(raw_text)
+    except Exception as exc:
+        print("Translation failed:", exc)
+
+    if GoogleTranslator is not None:
+        try:
+            translator = GoogleTranslator()
+            translated = translator.translate(
+                text, src=source_lang, dest=target_lang
+            ).text
+            return translated
+        except Exception as fallback_exc:  # pragma: no cover - best effort
+            print("Fallback translation failed:", fallback_exc)
+
+    return text
+
+
+class TranslationWorker(QtCore.QThread):
+    """Thread to run translations without blocking the UI."""
+
+    translation_ready = QtCore.Signal(str)
+
+    def __init__(self, text: str, source_lang: str, target_lang: str) -> None:
+        super().__init__()
+        self.text = text
+        self.source_lang = source_lang
+        self.target_lang = target_lang
+
+    def run(self) -> None:  # pragma: no cover - involves network
+        translated = translate_text(self.text, self.source_lang, self.target_lang)
+        self.translation_ready.emit(translated)
+
+
 class FloatingTranslatorWindow(QtWidgets.QWidget):
     def __init__(self):
         super().__init__(
@@ -172,9 +248,12 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         grip_row.addWidget(self.size_grip)
         main_layout.addLayout(grip_row)
 
-    def on_text_changed(self, text):
-        translated = self.translate_text(text)
-        self.translated_label.setText(translated)
+    def on_text_changed(self, text: str) -> None:
+        """Translate the provided text asynchronously."""
+        self.translated_label.setText("...")
+        self.worker = TranslationWorker(text, self.source_lang, self.target_lang)
+        self.worker.translation_ready.connect(self.translated_label.setText)
+        self.worker.start()
 
     def swap_languages(self):
         """Swap source and target languages."""
@@ -192,72 +271,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         """Handle the Enter key press from the input box."""
         self.on_text_changed(self.input_edit.toPlainText())
 
-    def translate_text(self, text):
-        """Translate text using Gemini following current language settings."""
-        if self.source_lang == "es":
-            prompt = (
-                "Translate the following Spanish text to English as a single"
-                " concise phrase. Respond only with the English translation"
-                " wrapped in double asterisks.\n\nSpanish: "
-                f"{text}"
-            )
-        else:
-            prompt = (
-                "Translate the following English text to Spanish as a single"
-                " concise phrase. Respond only with the Spanish translation"
-                " wrapped in double asterisks.\n\nEnglish: "
-                f"{text}"
-            )
-        payload = json.dumps(
-            {"contents": [{"parts": [{"text": prompt}]}]}
-        ).encode()
-        try:
-            req = request.Request(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
-                data=payload,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with request.urlopen(req) as resp:
-                data = json.loads(resp.read().decode())
-                raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-                if raw_text:
-                    return self.clean_translation(raw_text)
-        except Exception as exc:
-            print("Translation failed:", exc)
 
-        # If Gemini failed or returned empty, try googletrans if available
-        if GoogleTranslator is not None:
-            try:
-                translator = GoogleTranslator()
-                translated = translator.translate(
-                    text, src=self.source_lang, dest=self.target_lang
-                ).text
-                return translated
-            except Exception as fallback_exc:  # pragma: no cover - best effort
-                print("Fallback translation failed:", fallback_exc)
-
-        # As a last resort, return the original text
-        return text
-
-    def clean_translation(self, text: str) -> str:
-        """Return a simplified single-line translation."""
-        if not text:
-            return text
-        # Take only the first line if the model returned multiple suggestions
-        line = text.strip().splitlines()[0]
-        # Remove common bullet or formatting characters
-        line = line.lstrip("*-• ").strip()
-
-        # Extract content wrapped in double asterisks if present
-        match = re.search(r"\*\*(.+?)\*\*", line)
-        if match:
-            return match.group(1).strip()
-
-        if line.startswith("**") and line.endswith("**"):
-            line = line[2:-2]
-        line = line.strip("*")
-        return line
 
     def copy_translation(self):
         clipboard = QtWidgets.QApplication.clipboard()
