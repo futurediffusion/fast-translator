@@ -7,6 +7,12 @@ import re
 import time
 from urllib import request, error
 
+try:
+    from langdetect import detect, LangDetectException
+except Exception:  # pragma: no cover - optional dependency
+    detect = None
+    LangDetectException = Exception
+
 # Optional fallback translator if Gemini filtering fails
 try:
     from googletrans import Translator as GoogleTranslator
@@ -180,7 +186,21 @@ def remove_translation_item(translation: str) -> None:
     if keys:
         _save_cache()
 
+
+def detect_language(text: str) -> str:
+    """Best-effort language detection using ``langdetect``."""
+    if detect is None:
+        return "en"
+    try:
+        code = detect(text)
+    except LangDetectException:
+        return "en"
+    if code.startswith("zh"):
+        code = "zh"
+    return code if code in LANG_PROMPT_NAMES else "en"
+
 # Language options for the UI and prompt names used by the API
+# List of supported languages for the UI
 LANG_OPTIONS = [
     ("Español", "es"),
     ("Inglés", "en"),
@@ -188,8 +208,15 @@ LANG_OPTIONS = [
     ("Alemán", "de"),
     ("Italiano", "it"),
     ("Portugués", "pt"),
+    ("Catal\u00e1n", "ca"),
+    ("Chino", "zh"),
+    ("Japon\u00e9s", "ja"),
+    ("Coreano", "ko"),
+    ("Ruso", "ru"),
+    ("\u00c1rabe", "ar"),
 ]
 
+# English names used when prompting the API
 LANG_PROMPT_NAMES = {
     "es": "Spanish",
     "en": "English",
@@ -197,6 +224,12 @@ LANG_PROMPT_NAMES = {
     "de": "German",
     "it": "Italian",
     "pt": "Portuguese",
+    "ca": "Catalan",
+    "zh": "Chinese",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "ru": "Russian",
+    "ar": "Arabic",
 }
 
 
@@ -226,6 +259,8 @@ def _wait_rate_limit() -> None:
 
 def translate_text(text: str, source_lang: str, target_lang: str) -> str:
     """Translate text using Gemini API with caching and rate limiting."""
+    if source_lang == "auto":
+        source_lang = detect_language(text)
     key = (text, source_lang, target_lang)
     if key in _translation_cache:
         entry = _translation_cache[key]
@@ -395,6 +430,8 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
         self.src_combo = QtWidgets.QComboBox()
         self.dest_combo = QtWidgets.QComboBox()
+        # Allow automatic detection for the source language
+        self.src_combo.addItem("Detectar", "auto")
         for label, code in LANG_OPTIONS:
             self.src_combo.addItem(label, code)
             self.dest_combo.addItem(label, code)
@@ -406,7 +443,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         )
         self.src_combo.currentIndexChanged.connect(self.language_changed)
         self.dest_combo.currentIndexChanged.connect(self.language_changed)
-        self.src_combo.setCurrentIndex(0)
+        self.src_combo.setCurrentIndex(1)
         self.dest_combo.setCurrentIndex(1)
 
         self.swap_btn = QtWidgets.QPushButton("\u2192")
@@ -738,10 +775,14 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
     def swap_languages(self):
         """Swap source and target languages."""
-        src_index = self.src_combo.currentIndex()
-        dest_index = self.dest_combo.currentIndex()
-        self.src_combo.setCurrentIndex(dest_index)
-        self.dest_combo.setCurrentIndex(src_index)
+        src_code = self.src_combo.currentData()
+        dest_code = self.dest_combo.currentData()
+        src_idx = self.src_combo.findData(dest_code)
+        dest_idx = self.dest_combo.findData(src_code)
+        if src_idx != -1:
+            self.src_combo.setCurrentIndex(src_idx)
+        if dest_idx != -1:
+            self.dest_combo.setCurrentIndex(dest_idx)
 
     def translate_current_text(self):
         """Handle the Enter key press from the input box."""
