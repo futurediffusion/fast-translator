@@ -2,8 +2,10 @@
 
 from PySide6 import QtCore, QtGui, QtWidgets
 import json
+import os
 import re
-from urllib import request
+import time
+from urllib import request, error
 
 # Optional fallback translator if Gemini filtering fails
 try:
@@ -13,6 +15,36 @@ except Exception:  # pragma: no cover - optional dependency
 
 # API key for Google's Gemini generative language API
 GEMINI_API_KEY = "AIzaSyDnO8MO4qFgkOcSO2eHVZkfQ7cZ2KhrA5I"
+
+# Cache file to store previous translations
+CACHE_FILE = "translation_cache.json"
+# Minimum seconds between API calls
+MIN_REQUEST_INTERVAL = 1.0
+# Track time of last request
+LAST_REQUEST_TIME = 0.0
+
+# In-memory cache loaded from disk if available
+_translation_cache: dict[tuple[str, str, str], str] = {}
+if os.path.exists(CACHE_FILE):
+    try:
+        with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        for key, value in data.items():
+            parts = key.split("||")
+            if len(parts) == 3:
+                _translation_cache[(parts[0], parts[1], parts[2])] = value
+    except Exception as exc:  # pragma: no cover - best effort
+        print("Could not load cache:", exc)
+
+
+def _save_cache() -> None:
+    """Persist the translation cache to disk."""
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            data = {"||".join(k): v for k, v in _translation_cache.items()}
+            json.dump(data, f)
+    except Exception as exc:  # pragma: no cover - best effort
+        print("Could not save cache:", exc)
 
 # Language options for the UI and prompt names used by the API
 LANG_OPTIONS = [
@@ -49,8 +81,21 @@ def clean_translation(text: str) -> str:
     return line
 
 
+def _wait_rate_limit() -> None:
+    """Sleep if requests are happening too quickly."""
+    global LAST_REQUEST_TIME
+    elapsed = time.time() - LAST_REQUEST_TIME
+    if elapsed < MIN_REQUEST_INTERVAL:
+        time.sleep(MIN_REQUEST_INTERVAL - elapsed)
+    LAST_REQUEST_TIME = time.time()
+
+
 def translate_text(text: str, source_lang: str, target_lang: str) -> str:
-    """Translate text using Gemini API."""
+    """Translate text using Gemini API with caching and rate limiting."""
+    key = (text, source_lang, target_lang)
+    if key in _translation_cache:
+        return _translation_cache[key]
+
     src_name = LANG_PROMPT_NAMES.get(source_lang, source_lang)
     tgt_name = LANG_PROMPT_NAMES.get(target_lang, target_lang)
     prompt = (
@@ -59,20 +104,34 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
         f" wrapped in double asterisks.\n\n{src_name}: {text}"
     )
     payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode()
-    try:
-        req = request.Request(
-            f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with request.urlopen(req) as resp:
-            data = json.loads(resp.read().decode())
-            raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-            if raw_text:
-                return clean_translation(raw_text)
-    except Exception as exc:
-        print("Translation failed:", exc)
+    for attempt in range(3):
+        try:
+            _wait_rate_limit()
+            req = request.Request(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with request.urlopen(req) as resp:
+                data = json.loads(resp.read().decode())
+                raw_text = (
+                    data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                )
+                if raw_text:
+                    translated = clean_translation(raw_text)
+                    _translation_cache[key] = translated
+                    _save_cache()
+                    return translated
+        except error.HTTPError as http_err:  # pragma: no cover - network
+            if http_err.code == 429 and attempt < 2:
+                time.sleep(2 ** attempt + 1)
+                continue
+            print("Translation failed:", http_err)
+            break
+        except Exception as exc:  # pragma: no cover - network
+            print("Translation failed:", exc)
+            break
 
     if GoogleTranslator is not None:
         try:
@@ -80,6 +139,8 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
             translated = translator.translate(
                 text, src=source_lang, dest=target_lang
             ).text
+            _translation_cache[key] = translated
+            _save_cache()
             return translated
         except Exception as fallback_exc:  # pragma: no cover - best effort
             print("Fallback translation failed:", fallback_exc)
