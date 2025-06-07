@@ -23,6 +23,8 @@ except Exception:  # pragma: no cover - optional dependency
 GEMINI_API_KEY = ""
 THEME = "light"
 FONT_SIZE = 16
+# Default language used when auto switching
+DEFAULT_LANG = "es"
 
 # Optional config file storing the API key
 CONFIG_FILE = "config.json"
@@ -34,6 +36,7 @@ if os.path.exists(CONFIG_FILE):
             GEMINI_API_KEY = data.get("api_key", "")
             THEME = data.get("theme", THEME)
             FONT_SIZE = int(data.get("font_size", FONT_SIZE))
+            DEFAULT_LANG = data.get("default_lang", DEFAULT_LANG)
     except Exception as exc:  # pragma: no cover - best effort
         print("Could not load config:", exc)
 
@@ -111,6 +114,7 @@ def save_config() -> None:
                     "api_key": GEMINI_API_KEY,
                     "theme": THEME,
                     "font_size": FONT_SIZE,
+                    "default_lang": DEFAULT_LANG,
                 },
                 f,
             )
@@ -136,6 +140,13 @@ def set_font_size(value: int) -> None:
     """Update the font size and save it."""
     global FONT_SIZE
     FONT_SIZE = int(value)
+    save_config()
+
+
+def set_default_lang(value: str) -> None:
+    """Update the default language and save it."""
+    global DEFAULT_LANG
+    DEFAULT_LANG = value
     save_config()
 
 
@@ -360,6 +371,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.offset = None
         self.source_lang = "es"
         self.target_lang = "en"
+        self.default_lang = DEFAULT_LANG
         self.dark_mode = THEME == "dark"
         self.font_size = FONT_SIZE
         self.init_ui()
@@ -677,6 +689,23 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         font_row.addWidget(self.font_spin)
         layout.addLayout(font_row)
 
+        default_row = QtWidgets.QHBoxLayout()
+        default_row.addWidget(QtWidgets.QLabel("Idioma por defecto"))
+        self.default_combo = QtWidgets.QComboBox()
+        for label, code in LANG_OPTIONS:
+            self.default_combo.addItem(label, code)
+        idx = self.default_combo.findData(self.default_lang)
+        if idx != -1:
+            self.default_combo.setCurrentIndex(idx)
+        self.default_combo.currentIndexChanged.connect(
+            lambda i: (
+                setattr(self, "default_lang", self.default_combo.itemData(i)),
+                set_default_lang(self.default_combo.itemData(i)),
+            )
+        )
+        default_row.addWidget(self.default_combo)
+        layout.addLayout(default_row)
+
     def _on_theme_changed(self) -> None:
         self.dark_mode = self.theme_btn.isChecked()
         set_theme("dark" if self.dark_mode else "light")
@@ -738,6 +767,9 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.theme_btn.setChecked(self.dark_mode)
         self._update_theme_button()
         self.font_spin.setValue(self.font_size)
+        idx = self.default_combo.findData(self.default_lang)
+        if idx != -1:
+            self.default_combo.setCurrentIndex(idx)
         self.settings_popup.adjustSize()
         pos = self.settings_btn.mapToGlobal(
             QtCore.QPoint(0, -self.settings_popup.height())
@@ -773,6 +805,21 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.loading_timer.stop()
         self.translated_label.setText(text)
 
+    def _auto_set_langs(self, text: str) -> None:
+        """Automatically adjust source and target languages based on ``text``."""
+        if not text.strip():
+            return
+        detected = detect_language(text)
+        src_idx = self.src_combo.findData(detected)
+        if src_idx != -1:
+            self.src_combo.setCurrentIndex(src_idx)
+        if detected == self.dest_combo.currentData():
+            self.swap_languages()
+        elif detected != self.default_lang:
+            dest_idx = self.dest_combo.findData(self.default_lang)
+            if dest_idx != -1:
+                self.dest_combo.setCurrentIndex(dest_idx)
+
     def swap_languages(self):
         """Swap source and target languages."""
         src_code = self.src_combo.currentData()
@@ -786,7 +833,9 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
     def translate_current_text(self):
         """Handle the Enter key press from the input box."""
-        self.on_text_changed(self.input_edit.toPlainText())
+        text = self.input_edit.toPlainText()
+        self._auto_set_langs(text)
+        self.on_text_changed(text)
 
     def language_changed(self, *args):
         if not hasattr(self, "input_edit"):

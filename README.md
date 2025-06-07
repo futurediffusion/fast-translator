@@ -6,6 +6,12 @@ the source and target languages from the drop-down menus. The source list now
 includes an "Detectar" option for automatic language detection and several
 additional languages such as Chinese, Japanese and Russian.
 
+When translating text the application automatically detects the input
+language. If the text is in the same language as the current target, the
+languages are swapped so the translation always goes to the opposite side.
+You can set a default language in the settings panel that will be used as the
+target whenever a new language is detected.
+
 ## Installation
 
 Install the required dependencies using pip:
