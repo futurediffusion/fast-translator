@@ -623,10 +623,13 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.api_link.setStyleSheet("color: #2196F3;")
         layout.addWidget(self.api_link)
 
-        self.dark_checkbox = QtWidgets.QCheckBox("Modo oscuro")
-        self.dark_checkbox.setChecked(THEME == "dark")
-        self.dark_checkbox.stateChanged.connect(lambda _=None: self._on_theme_changed())
-        layout.addWidget(self.dark_checkbox)
+        self.theme_btn = QtWidgets.QPushButton()
+        self.theme_btn.setCheckable(True)
+        self.theme_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.theme_btn.setChecked(THEME == "dark")
+        self.theme_btn.clicked.connect(lambda _=None: self._on_theme_changed())
+        layout.addWidget(self.theme_btn)
+        self._update_theme_button()
 
         font_row = QtWidgets.QHBoxLayout()
         font_row.addWidget(QtWidgets.QLabel("Tama\u00f1o fuente"))
@@ -638,9 +641,10 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         layout.addLayout(font_row)
 
     def _on_theme_changed(self) -> None:
-        self.dark_mode = self.dark_checkbox.isChecked()
+        self.dark_mode = self.theme_btn.isChecked()
         set_theme("dark" if self.dark_mode else "light")
         self.apply_theme()
+        self._update_theme_button()
 
     def _on_font_changed(self) -> None:
         self.font_size = self.font_spin.value()
@@ -680,9 +684,22 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         )
         self.api_link.setStyleSheet(f"color: {link_color};")
 
+    def _update_theme_button(self) -> None:
+        if self.theme_btn.isChecked():
+            self.theme_btn.setText("\u2600 Light mode")
+            self.theme_btn.setStyleSheet(
+                "QPushButton { background-color: white; color: black; border-radius: 16px; padding: 4px 8px; }"
+            )
+        else:
+            self.theme_btn.setText("\U0001F319 Dark mode")
+            self.theme_btn.setStyleSheet(
+                "QPushButton { background-color: #2196F3; color: white; border-radius: 16px; padding: 4px 8px; }"
+            )
+
     def show_settings(self):
         self.api_key_edit.setText(GEMINI_API_KEY)
-        self.dark_checkbox.setChecked(self.dark_mode)
+        self.theme_btn.setChecked(self.dark_mode)
+        self._update_theme_button()
         self.font_spin.setValue(self.font_size)
         self.settings_popup.adjustSize()
         pos = self.settings_btn.mapToGlobal(

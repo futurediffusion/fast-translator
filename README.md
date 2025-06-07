@@ -54,6 +54,8 @@ options to export the history to a text file or clear it entirely. The cache is
 automatically trimmed to the 15 most frequently used entries so it stays
 lightweight.
 
-The settings popup now includes options for dark mode and adjusting the font
-size. A blue minimize button next to the red close button lets you minimize the
-window when you want it out of the way.
+The settings popup now includes a button for toggling dark mode as well as an
+option to adjust the font size. The button displays a moon when the interface
+is light and a sun when it is dark, switching the theme with a single click. A
+blue minimize button next to the red close button lets you minimize the window
+when you want it out of the way.
