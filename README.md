@@ -20,8 +20,9 @@ Run the translator with:
 python floating_translator.py
 ```
 
-The application contains a built-in example API key, but you can modify the
-`GEMINI_API_KEY` constant in `floating_translator.py` to use your own.
+The application starts without an API key. Click the gear button in the bottom
+right corner to open the settings popup and enter your own key. The key is
+stored in `config.json` so you only need to provide it once.
 
 The translator prompts the Gemini API to respond with the target-language
 translation enclosed in double asterisks (for example `**hola**`).

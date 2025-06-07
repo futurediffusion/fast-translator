@@ -14,7 +14,18 @@ except Exception:  # pragma: no cover - optional dependency
     GoogleTranslator = None
 
 # API key for Google's Gemini generative language API
-GEMINI_API_KEY = "AIzaSyDnO8MO4qFgkOcSO2eHVZkfQ7cZ2KhrA5I"
+GEMINI_API_KEY = ""
+
+# Optional config file storing the API key
+CONFIG_FILE = "config.json"
+
+if os.path.exists(CONFIG_FILE):
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            GEMINI_API_KEY = data.get("api_key", "")
+    except Exception as exc:  # pragma: no cover - best effort
+        print("Could not load config:", exc)
 
 # Cache file to store previous translations
 CACHE_FILE = "translation_cache.json"
@@ -60,6 +71,22 @@ def _save_cache() -> None:
             json.dump(data, f)
     except Exception as exc:  # pragma: no cover - best effort
         print("Could not save cache:", exc)
+
+
+def save_config() -> None:
+    """Persist the API key to disk."""
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump({"api_key": GEMINI_API_KEY}, f)
+    except Exception as exc:  # pragma: no cover - best effort
+        print("Could not save config:", exc)
+
+
+def set_api_key(key: str) -> None:
+    """Update the API key and save it."""
+    global GEMINI_API_KEY
+    GEMINI_API_KEY = key.strip()
+    save_config()
 
 
 def get_translation_history() -> list[tuple[str, int]]:
@@ -409,9 +436,86 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
         grip_row = QtWidgets.QHBoxLayout()
         grip_row.addStretch()
+
+        self.settings_btn = QtWidgets.QPushButton("\u2699")
+        self.settings_btn.setObjectName("settings")
+        self.settings_btn.setFixedSize(32, 32)
+        self.settings_btn.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
+        self.settings_btn.clicked.connect(self.show_settings)
+        self.settings_btn.setStyleSheet(
+            "QPushButton#settings {"
+            "background-color: #2196F3;"
+            "color: white;"
+            "border-radius: 16px;"
+            "border: none;"
+            "font-size: 18px;"
+            "}"
+            "QPushButton#settings:hover { background-color: #42a5f5; }"
+        )
+        grip_row.addWidget(self.settings_btn)
+
         self.size_grip = QtWidgets.QSizeGrip(self.container)
         grip_row.addWidget(self.size_grip)
         main_layout.addLayout(grip_row)
+
+        self._init_settings_popup()
+
+    def _init_settings_popup(self) -> None:
+        self.settings_popup = QtWidgets.QFrame(self, QtCore.Qt.Popup)
+        self.settings_popup.setObjectName("settings_popup")
+        self.settings_popup.setStyleSheet(
+            "#settings_popup {"
+            "background-color: rgba(255, 255, 255, 0.95);"
+            "border-radius: 16px;"
+            "}"
+        )
+        layout = QtWidgets.QVBoxLayout(self.settings_popup)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        top_row = QtWidgets.QHBoxLayout()
+        top_row.addStretch()
+        close_btn = QtWidgets.QPushButton("\u2715", self.settings_popup)
+        close_btn.setObjectName("close")
+        close_btn.setFixedSize(24, 24)
+        close_btn.clicked.connect(self.settings_popup.hide)
+        close_btn.setStyleSheet(
+            "QPushButton#close {"
+            "border: none;"
+            "background: transparent;"
+            "color: red;"
+            "font-weight: bold;"
+            "font-size: 18px;"
+            "}"
+            "QPushButton#close:hover { color: #ff6666; }"
+        )
+        top_row.addWidget(close_btn)
+        layout.addLayout(top_row)
+
+        self.api_key_edit = QtWidgets.QLineEdit()
+        self.api_key_edit.setPlaceholderText("API key")
+        self.api_key_edit.editingFinished.connect(
+            lambda: set_api_key(self.api_key_edit.text())
+        )
+        layout.addWidget(self.api_key_edit)
+
+        link = QtWidgets.QLabel(
+            '<a href="https://aistudio.google.com/app/apikey">consigue tu api key aqui</a>'
+        )
+        link.setOpenExternalLinks(True)
+        font = link.font()
+        font.setPointSize(8)
+        link.setFont(font)
+        layout.addWidget(link)
+
+    def show_settings(self):
+        self.api_key_edit.setText(GEMINI_API_KEY)
+        self.settings_popup.adjustSize()
+        pos = self.settings_btn.mapToGlobal(
+            QtCore.QPoint(0, -self.settings_popup.height())
+        )
+        self.settings_popup.move(pos)
+        self.settings_popup.show()
 
     def _update_loading_dots(self) -> None:
         """Update the loading indicator with an animated ellipsis."""
