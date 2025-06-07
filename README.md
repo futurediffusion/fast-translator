@@ -28,6 +28,11 @@ translation enclosed in double asterisks (for example `**hola**`).
 The application filters the response to display only the text inside the
 asterisks.
 
+Previous translations are stored in `translation_cache.json` so frequent
+requests are reused without contacting the API. A small delay is also applied
+between requests and the application automatically retries when the API
+responds with HTTP 429 errors.
+
 Press `Ctrl+Enter` (or `Ctrl+Return`) inside the input box to send the text
 for translation. The input field supports multiple lines so you can type
 longer passages.
