@@ -810,15 +810,17 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         if not text.strip():
             return
         detected = detect_language(text)
-        src_idx = self.src_combo.findData(detected)
-        if src_idx != -1:
-            self.src_combo.setCurrentIndex(src_idx)
         if detected == self.dest_combo.currentData():
+            # swap first so we keep the previous source on the right
             self.swap_languages()
         elif detected != self.default_lang:
             dest_idx = self.dest_combo.findData(self.default_lang)
             if dest_idx != -1:
                 self.dest_combo.setCurrentIndex(dest_idx)
+
+        src_idx = self.src_combo.findData(detected)
+        if src_idx != -1:
+            self.src_combo.setCurrentIndex(src_idx)
 
     def swap_languages(self):
         """Swap source and target languages."""
