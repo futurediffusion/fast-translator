@@ -3,6 +3,14 @@
 A small PySide6 application that floats above other windows and translates
 Spanish text into English using Google's Gemini generative language API.
 
+## Installation
+
+Install the required dependencies using pip:
+
+```bash
+pip install -r requirements.txt
+```
+
 ## Usage
 
 Run the translator with:
