@@ -47,24 +47,43 @@ if os.path.exists(CACHE_FILE):
                     _translation_cache[(parts[0], parts[1], parts[2])] = {
                         "translation": value.get("translation", ""),
                         "count": int(value.get("count", 0)),
+                        "time": float(value.get("time", time.time())),
                     }
                 else:
                     _translation_cache[(parts[0], parts[1], parts[2])] = {
                         "translation": value,
                         "count": 0,
+                        "time": time.time(),
                     }
     except Exception as exc:  # pragma: no cover - best effort
         print("Could not load cache:", exc)
 
 
+def _trim_cache(max_size: int = 15) -> None:
+    """Remove old/unused entries keeping the most popular ones."""
+    if len(_translation_cache) <= max_size:
+        return
+    items = sorted(
+        _translation_cache.items(),
+        key=lambda kv: (
+            -int(kv[1].get("count", 0)),
+            -float(kv[1].get("time", 0.0)),
+        ),
+    )
+    for key, _ in items[max_size:]:
+        _translation_cache.pop(key, None)
+
+
 def _save_cache() -> None:
     """Persist the translation cache to disk."""
+    _trim_cache()
     try:
         with open(CACHE_FILE, "w", encoding="utf-8") as f:
             data = {
                 "||".join(k): {
                     "translation": v.get("translation", ""),
                     "count": int(v.get("count", 0)),
+                    "time": float(v.get("time", time.time())),
                 }
                 for k, v in _translation_cache.items()
             }
@@ -91,11 +110,37 @@ def set_api_key(key: str) -> None:
 
 def get_translation_history() -> list[tuple[str, int]]:
     """Return cached translations ordered by most frequently used."""
-    items: list[tuple[str, int]] = []
+    items: list[tuple[str, int, float]] = []
     for entry in _translation_cache.values():
-        items.append((entry.get("translation", ""), int(entry.get("count", 0))))
-    items.sort(key=lambda x: x[1], reverse=True)
-    return items
+        items.append(
+            (
+                entry.get("translation", ""),
+                int(entry.get("count", 0)),
+                float(entry.get("time", 0.0)),
+            )
+        )
+    items.sort(key=lambda x: (x[1], x[2]), reverse=True)
+    return [(t, c) for t, c, _ in items]
+
+
+def clear_translation_history() -> None:
+    """Remove all cached translations from memory and disk."""
+    _translation_cache.clear()
+    if os.path.exists(CACHE_FILE):
+        try:
+            os.remove(CACHE_FILE)
+        except Exception as exc:  # pragma: no cover - best effort
+            print("Could not delete cache:", exc)
+
+
+def export_translation_history(path: str) -> None:
+    """Write the history to ``path`` as tab-separated values."""
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            for translation, count in get_translation_history():
+                f.write(f"{translation}\t{count}\n")
+    except Exception as exc:  # pragma: no cover - best effort
+        print("Could not export history:", exc)
 
 # Language options for the UI and prompt names used by the API
 LANG_OPTIONS = [
@@ -147,6 +192,7 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
     if key in _translation_cache:
         entry = _translation_cache[key]
         entry["count"] = entry.get("count", 0) + 1
+        entry["time"] = time.time()
         _save_cache()
         return entry["translation"]
 
@@ -174,7 +220,11 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
                 )
                 if raw_text:
                     translated = clean_translation(raw_text)
-                    _translation_cache[key] = {"translation": translated, "count": 1}
+                    _translation_cache[key] = {
+                        "translation": translated,
+                        "count": 1,
+                        "time": time.time(),
+                    }
                     _save_cache()
                     return translated
         except error.HTTPError as http_err:  # pragma: no cover - network
@@ -193,7 +243,11 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
             translated = translator.translate(
                 text, src=source_lang, dest=target_lang
             ).text
-            _translation_cache[key] = {"translation": translated, "count": 1}
+            _translation_cache[key] = {
+                "translation": translated,
+                "count": 1,
+                "time": time.time(),
+            }
             _save_cache()
             return translated
         except Exception as fallback_exc:  # pragma: no cover - best effort
@@ -576,10 +630,34 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         for translation, count in get_translation_history():
             action = menu.addAction(f"{translation} ({count})")
             action.setData(translation)
-        if not menu.actions():
+        has_history = bool(menu.actions())
+        if not has_history:
             menu.addAction("(no history)")
-        action = menu.exec(self.history_btn.mapToGlobal(QtCore.QPoint(0, self.history_btn.height())))
-        if action and action.data():
+        if has_history:
+            menu.addSeparator()
+        export_action = menu.addAction("Export history...")
+        clear_action = menu.addAction("Clear history")
+
+        action = menu.exec(
+            self.history_btn.mapToGlobal(QtCore.QPoint(0, self.history_btn.height()))
+        )
+        if not action:
+            return
+        if action == clear_action:
+            clear_translation_history()
+            self.translated_label.setText("")
+            return
+        if action == export_action:
+            path, _ = QtWidgets.QFileDialog.getSaveFileName(
+                self,
+                "Export History",
+                "translation_history.txt",
+                "Text Files (*.txt);;All Files (*)",
+            )
+            if path:
+                export_translation_history(path)
+            return
+        if action.data():
             selected = action.data()
             self.translated_label.setText(selected)
             clipboard = QtWidgets.QApplication.clipboard()

@@ -48,4 +48,7 @@ longer passages.
 Click the small down-arrow button next to the copy icon to open the history
 menu. It lists previous translations ordered by how often each one has been
 used, showing a counter for every entry. Selecting an item copies the text to
-the clipboard and displays it again in the output label.
+the clipboard and displays it again in the output label. The menu also provides
+options to export the history to a text file or clear it entirely. The cache is
+automatically trimmed to the 15 most frequently used entries so it stays
+lightweight.
