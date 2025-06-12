@@ -5,6 +5,8 @@ import json
 import os
 import re
 import time
+import threading
+import keyboard
 from urllib import request, error
 
 try:
@@ -839,6 +841,17 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self._auto_set_langs(text)
         self.on_text_changed(text)
 
+    @QtCore.Slot(str)
+    def handle_hotkey_text(self, text: str) -> None:
+        """Receive text from the global hotkey and translate it."""
+        if not text:
+            return
+        self.input_edit.setPlainText(text)
+        self.translate_current_text()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
     def language_changed(self, *args):
         if not hasattr(self, "input_edit"):
             return
@@ -951,8 +964,30 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         super().closeEvent(event)
 
 
+def start_global_hotkey(window: "FloatingTranslatorWindow", hotkey: str = "ctrl+shift+t") -> None:
+    """Listen for ``hotkey`` globally and send the clipboard text to ``window``."""
+
+    def handle_hotkey() -> None:
+        keyboard.press_and_release("ctrl+c")
+        time.sleep(0.05)
+        text = QtWidgets.QApplication.clipboard().text()
+        QtCore.QMetaObject.invokeMethod(
+            window,
+            "handle_hotkey_text",
+            QtCore.Qt.QueuedConnection,
+            QtCore.Q_ARG(str, text),
+        )
+
+    thread = threading.Thread(
+        target=lambda: (keyboard.add_hotkey(hotkey, handle_hotkey), keyboard.wait()),
+        daemon=True,
+    )
+    thread.start()
+
+
 if __name__ == "__main__":
     app = QtWidgets.QApplication([])
     window = FloatingTranslatorWindow()
     window.show()
+    start_global_hotkey(window)
     app.exec()
