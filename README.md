@@ -71,5 +71,6 @@ when you want it out of the way.
 ## Global hotkey
 
 Press `Ctrl+Shift+T` anywhere to translate the currently selected text. The
-application simulates a copy operation, grabs the clipboard contents and shows
-the English translation in the floating window.
+application copies the selection, sends it for translation and then pastes the
+result back so the highlighted text is replaced with its English equivalent.
+The translated phrase is also shown in the floating window.
