@@ -285,9 +285,9 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
     src_name = LANG_PROMPT_NAMES.get(source_lang, source_lang)
     tgt_name = LANG_PROMPT_NAMES.get(target_lang, target_lang)
     prompt = (
-        f"Translate the following {src_name} text to {tgt_name} as a single"
-        f" concise phrase. Respond only with the {tgt_name} translation"
-        f" wrapped in double asterisks.\n\n{src_name}: {text}"
+        f"Translate the following {src_name} text to {tgt_name} without"
+        f" summarizing or shortening it. Respond only with the {tgt_name}"
+        f" translation wrapped in double asterisks.\n\n{src_name}: {text}"
     )
     payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode()
     for attempt in range(3):
