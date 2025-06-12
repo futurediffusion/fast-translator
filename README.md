@@ -67,3 +67,9 @@ option to adjust the font size. The button displays a moon when the interface
 is light and a sun when it is dark, switching the theme with a single click. A
 blue minimize button next to the red close button lets you minimize the window
 when you want it out of the way.
+
+## Global hotkey
+
+Press `Ctrl+Shift+T` anywhere to translate the currently selected text. The
+application simulates a copy operation, grabs the clipboard contents and shows
+the English translation in the floating window.
