@@ -976,7 +976,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         super().closeEvent(event)
 
 
-def start_global_hotkey(window: "FloatingTranslatorWindow", hotkey: str = "ctrl+shift+t") -> None:
+def start_global_hotkey(window: "FloatingTranslatorWindow", hotkey: str = "ctrl+shift+x") -> None:
     """Listen for ``hotkey`` globally and translate the selected text."""
 
     def handle_hotkey() -> None:
