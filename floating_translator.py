@@ -384,6 +384,11 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.thread_pool = QtCore.QThreadPool.globalInstance()
         self.tasks: list[TranslationTask] = []
 
+    @QtCore.Slot(str)
+    def set_clipboard_text(self, text: str) -> None:
+        """Set clipboard text on the GUI thread."""
+        QtWidgets.QApplication.clipboard().setText(text)
+
     def init_ui(self):
         # Main container with rounded corners and translucent background
         self.container = QtWidgets.QFrame(self)
@@ -996,11 +1001,10 @@ def start_global_hotkey(window: "FloatingTranslatorWindow", hotkey: str = "ctrl+
             QtCore.Q_ARG(str, translated),
         )
         QtCore.QMetaObject.invokeMethod(
-            QtWidgets.QApplication.clipboard(),
-            "setText",
+            window,
+            "set_clipboard_text",
             QtCore.Qt.QueuedConnection,
             QtCore.Q_ARG(str, translated),
-            QtCore.Q_ARG(QtGui.QClipboard.Mode, QtGui.QClipboard.Clipboard),
         )
         keyboard.press_and_release("ctrl+v")
 
