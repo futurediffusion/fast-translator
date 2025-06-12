@@ -1003,7 +1003,7 @@ def start_global_hotkey(window: "FloatingTranslatorWindow", hotkey: str = "ctrl+
         QtCore.QMetaObject.invokeMethod(
             window,
             "set_clipboard_text",
-            QtCore.Qt.QueuedConnection,
+            QtCore.Qt.BlockingQueuedConnection,
             QtCore.Q_ARG(str, translated),
         )
         keyboard.press_and_release("ctrl+v")
