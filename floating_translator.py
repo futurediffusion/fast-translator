@@ -1000,6 +1000,7 @@ def start_global_hotkey(window: "FloatingTranslatorWindow", hotkey: str = "ctrl+
             "setText",
             QtCore.Qt.QueuedConnection,
             QtCore.Q_ARG(str, translated),
+            QtCore.Q_ARG(QtGui.QClipboard.Mode, QtGui.QClipboard.Clipboard),
         )
         keyboard.press_and_release("ctrl+v")
 
