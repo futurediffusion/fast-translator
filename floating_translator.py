@@ -852,6 +852,17 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.raise_()
         self.activateWindow()
 
+    @QtCore.Slot(str, str)
+    def handle_hotkey_translation(self, original: str, translated: str) -> None:
+        """Display translation from a global hotkey without re-translating."""
+        if not original:
+            return
+        self.input_edit.setPlainText(original)
+        self._display_translation(translated)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
     def language_changed(self, *args):
         if not hasattr(self, "input_edit"):
             return
@@ -965,17 +976,23 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
 
 def start_global_hotkey(window: "FloatingTranslatorWindow", hotkey: str = "ctrl+shift+t") -> None:
-    """Listen for ``hotkey`` globally and send the clipboard text to ``window``."""
+    """Listen for ``hotkey`` globally and replace the selection with its translation."""
 
     def handle_hotkey() -> None:
         keyboard.press_and_release("ctrl+c")
         time.sleep(0.05)
         text = QtWidgets.QApplication.clipboard().text()
+        if not text:
+            return
+        translated = translate_text(text, "auto", window.target_lang)
+        QtWidgets.QApplication.clipboard().setText(translated)
+        keyboard.press_and_release("ctrl+v")
         QtCore.QMetaObject.invokeMethod(
             window,
-            "handle_hotkey_text",
+            "handle_hotkey_translation",
             QtCore.Qt.QueuedConnection,
             QtCore.Q_ARG(str, text),
+            QtCore.Q_ARG(str, translated),
         )
 
     thread = threading.Thread(
