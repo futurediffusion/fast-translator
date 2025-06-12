@@ -843,11 +843,20 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
     @QtCore.Slot(str)
     def handle_hotkey_text(self, text: str) -> None:
-        """Receive text from the global hotkey and translate it."""
+        """Display text grabbed by the global hotkey."""
         if not text:
             return
         self.input_edit.setPlainText(text)
-        self.translate_current_text()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    @QtCore.Slot(str)
+    def handle_hotkey_translation(self, text: str) -> None:
+        """Show a translation triggered by the global hotkey."""
+        if not text:
+            return
+        self.translated_label.setText(text)
         self.show()
         self.raise_()
         self.activateWindow()
@@ -965,7 +974,7 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
 
 
 def start_global_hotkey(window: "FloatingTranslatorWindow", hotkey: str = "ctrl+shift+t") -> None:
-    """Listen for ``hotkey`` globally and send the clipboard text to ``window``."""
+    """Listen for ``hotkey`` globally and translate the selected text."""
 
     def handle_hotkey() -> None:
         keyboard.press_and_release("ctrl+c")
@@ -977,6 +986,23 @@ def start_global_hotkey(window: "FloatingTranslatorWindow", hotkey: str = "ctrl+
             QtCore.Qt.QueuedConnection,
             QtCore.Q_ARG(str, text),
         )
+        if not text:
+            return
+        translated = translate_text(text, "auto", "en")
+        QtCore.QMetaObject.invokeMethod(
+            window,
+            "handle_hotkey_translation",
+            QtCore.Qt.QueuedConnection,
+            QtCore.Q_ARG(str, translated),
+        )
+        QtCore.QMetaObject.invokeMethod(
+            QtWidgets.QApplication.clipboard(),
+            "setText",
+            QtCore.Qt.QueuedConnection,
+            QtCore.Q_ARG(str, translated),
+            QtCore.Q_ARG(QtGui.QClipboard.Mode, QtGui.QClipboard.Clipboard),
+        )
+        keyboard.press_and_release("ctrl+v")
 
     thread = threading.Thread(
         target=lambda: (keyboard.add_hotkey(hotkey, handle_hotkey), keyboard.wait()),
