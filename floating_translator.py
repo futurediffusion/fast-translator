@@ -854,7 +854,6 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.input_edit.setPlainText(text)
         self.show()
         self.raise_()
-        self.activateWindow()
 
     @QtCore.Slot(str)
     def handle_hotkey_translation(self, text: str) -> None:
@@ -864,7 +863,6 @@ class FloatingTranslatorWindow(QtWidgets.QWidget):
         self.translated_label.setText(text)
         self.show()
         self.raise_()
-        self.activateWindow()
 
     def language_changed(self, *args):
         if not hasattr(self, "input_edit"):
